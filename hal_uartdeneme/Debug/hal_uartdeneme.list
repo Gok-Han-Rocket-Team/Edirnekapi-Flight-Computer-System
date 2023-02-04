@@ -2653,11 +2653,11 @@ int main(void)
  800191c:	4914      	ldr	r1, [pc, #80]	; (8001970 <main+0x80>)
  800191e:	4815      	ldr	r0, [pc, #84]	; (8001974 <main+0x84>)
  8001920:	f7ff fde8 	bl	80014f4 <gpsBaslat>
-
+  //HAL_UART_Transmit(&huart2, (uint8_t*)itoa(sizeof(zaman), buf, 10), 1, 100);
+  while (1)
+  {
+    /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
-
-
-
 	  if(hataKodu > 0){
  8001924:	4b14      	ldr	r3, [pc, #80]	; (8001978 <main+0x88>)
  8001926:	881b      	ldrh	r3, [r3, #0]
@@ -2688,7 +2688,6 @@ int main(void)
  8001956:	6013      	str	r3, [r2, #0]
  8001958:	e7e4      	b.n	8001924 <main+0x34>
 		  }
-
 	  }
 	  else{
 		  HAL_GPIO_WritePin(ledR_GPIO_Port, ledR_Pin, GPIO_PIN_RESET);
