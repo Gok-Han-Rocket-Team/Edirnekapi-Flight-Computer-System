@@ -6,8 +6,8 @@
  */
 #include "queternion.h"
 #include "math.h"
-double v[3] = {0.0, 0.0, 1.0};
-float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
+
+static float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
 
 void updateQuaternion(float gx, float gy, float gz, float dt) {
   // Convert angular velocities to quaternion rates of change
@@ -31,8 +31,15 @@ void updateQuaternion(float gx, float gy, float gz, float dt) {
 }
 
 void quaternionToEuler(float* roll, float* pitch, float* yaw) {
-  // Convert quaternion to Euler angles
   *roll = atan2(2.0f * (q0 * q1 + q2 * q3), 1.0f - 2.0f * (q1 * q1 + q2 * q2)) * (180.0 / M_PI);
   *pitch = asin(2.0f * (q0 * q2 - q3 * q1)) * (180.0 / M_PI);
   *yaw = atan2(2.0f * (q0 * q3 + q1 * q2), 1.0f - 2.0f * (q2 * q2 + q3 * q3)) * (180.0 / M_PI);
+}
+
+void quaternionSet_zero(void)
+{
+	q0 = 1.0f;
+	q1 = 0.0f;
+	q2 = 0.0f;
+	q3 = 0.0f;
 }

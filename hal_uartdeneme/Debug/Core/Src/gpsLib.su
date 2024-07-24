@@ -1,7 +1,0 @@
-../Core/Src/gpsLib.c:26:17:zamanAyikla	40	static
-../Core/Src/gpsLib.c:66:17:konumAyikla	64	static
-../Core/Src/gpsLib.c:164:17:irtifa_uyduSAyikla	32	static
-../Core/Src/gpsLib.c:193:6:gpsBaslat	16	static
-../Core/Src/gpsLib.c:212:10:gpsAyikla	216	static
-../Core/Src/gpsLib.c:281:6:gpsYazdir	56	static
-../Core/Src/gpsLib.c:303:6:gpsHataYazdir	80	static

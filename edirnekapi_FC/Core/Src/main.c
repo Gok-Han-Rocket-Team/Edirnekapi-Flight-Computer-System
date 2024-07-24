@@ -57,21 +57,11 @@ UART_HandleTypeDef huart2;
 //static BME_280_t BME280_sensor;
 static bmi088_struct_t BMI_sensor;
 
-typedef struct {
-    float roll;  // Yaw açısı
-    float pitch; // Pitch açısı
-    float yaw;   // Roll açısı
-} EulerAngle;
-
-extern double q[4];
-extern double vector[3];
-extern float q0 , q1, q2, q3;
 
 // Free parameters in the Mahony filter and fusion scheme,
 // Kp for proportional feedback, Ki for integral
-float Kp = 30.0;
-float Ki = 0.0;
-extern float roll, pitch, yaw;
+
+
 extern int errorLine;
 
 float currentTime = 0;
@@ -209,12 +199,6 @@ int main(void)
 
 			 lastTime = currentTime;
 
-		 }
-		 if(HAL_GetTick() > 10000 && HAL_GetTick() < 10500){
-			 q0 = 1.0f;
-		 	 q1 = 0.0f;
-		 	 q2 = 0.0f;
-		 	 q3 = 0.0f;
 		 }
 
   }

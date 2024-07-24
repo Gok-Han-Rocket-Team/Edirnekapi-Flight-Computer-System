@@ -12,8 +12,10 @@
 #include <stdio.h>
 #include <string.h>
 
+extern float roll, pitch, yaw;
+
 #define CARD_1
-#define CARD_2
+//#define CARD_2
 
 //Accelerometer register address
 #define ACC_I2C_ADD				((uint8_t)0x18 << 1)
