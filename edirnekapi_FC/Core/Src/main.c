@@ -28,6 +28,7 @@
 #include "bmi088.h"
 #include "algorithms.h"
 #include "queternion.h"
+#include "lora.h"
 
 /* USER CODE END Includes */
 
@@ -46,9 +47,12 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- I2C_HandleTypeDef hi2c1;
+ ADC_HandleTypeDef hadc1;
+
+I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
 
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
@@ -56,7 +60,7 @@ UART_HandleTypeDef huart2;
 
 //static BME_280_t BME280_sensor;
 static bmi088_struct_t BMI_sensor;
-
+static lorastruct e22_lora;
 
 // Free parameters in the Mahony filter and fusion scheme,
 // Kp for proportional feedback, Ki for integral
@@ -66,6 +70,7 @@ extern int errorLine;
 
 float currentTime = 0;
 float lastTime =0;
+float lastTime2 =0;
 
 int counter = 0;
 int counterAcc = 0;
@@ -90,9 +95,11 @@ static void MX_I2C1_Init(void);
 static void MX_I2C3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_UART4_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 static void bmiBegin();
-
+static void loraBegin();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -133,11 +140,19 @@ int main(void)
   MX_I2C3_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
+  MX_UART4_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   //bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_4);
   HAL_NVIC_DisableIRQ(EXTI3_IRQn);
   HAL_NVIC_DisableIRQ(EXTI4_IRQn);
+
   bmiBegin();
+  loraBegin();
+  HAL_UART_DeInit(&huart4);
+  HAL_Delay(10);
+  huart4.Init.BaudRate = 115200;
+  HAL_UART_Init(&huart4);
   HAL_Delay(200);
   //HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,38400*27\r\n", strlen("$PMTK251,38400*27\r\n"), 100);
   /* USER CODE END 2 */
@@ -162,17 +177,18 @@ int main(void)
 #endif
 
 
-	  /*
-	 if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_RXNE) == SET) {
-		 HAL_UART_Receive(&huart2, (uint8_t *) dat, 1, 100);
+/*
+	 if (__HAL_UART_GET_FLAG(&huart4, UART_FLAG_RXNE) == SET) {
+		 uint8_t dat[1];
+		 HAL_UART_Receive(&huart4, (uint8_t *) dat, 1, 100);
 		 HAL_UART_Transmit(&huart1, (uint8_t *) dat, 1, 100);
 		 HAL_GPIO_TogglePin(Led_GPIO_Port, Led_Pin);
 	 }
-	 */
+*/
 
 	  currentTime = ((float)HAL_GetTick()) / 1000.0;
 
-		 if(currentTime - lastTime > 0.03)
+		 if(currentTime - lastTime > 0.2)
 		 {
 
 			 //sprintf((char*)buf, "temp = %.2fC  time %.0fuS A_x: %.1fmG  A_y: %.1fm  A_z: %.1fmG   G_z: %fdps\r\n", BMI_sensor.temp, BMI_sensor.currentTime, BMI_sensor.acc_x, BMI_sensor.acc_y, BMI_sensor.acc_z, BMI_sensor.gyro_z);
@@ -193,12 +209,26 @@ int main(void)
 			 //sprintf((char*)buf, "q[0]: %f  q[1]: %f  q[2]: %f   q[3]: %f\r\n", q[0], q[1], q[2], q[3]);
 			 //sprintf((char*)buf, "v[0]: %f  v[1]: %f  v[2]: %f   teta: %f\r\n", vector[0], vector[1], vector[2], (180.0 / M_PI) * atan2(sqrt(pow(vector[0],2.0) + pow(vector[1],2.0)), vector[2]));
 			 //sprintf((char*)buf, "teta: %f\r\n", (180.0 / M_PI) * atan2(sqrt(pow(BMI_sensor.acc_x,2.0) + pow(BMI_sensor.acc_y,2.0)), BMI_sensor.acc_z));
-			 sprintf((char*)buf, "A %f %f %f\r\n", yaw,  -roll, pitch);
+			 //sprintf((char*)buf, "A %f %f %f\r\n", yaw,  -roll, pitch);
+			  HAL_ADC_Start(&hadc1);
+			  HAL_ADC_PollForConversion(&hadc1, 100);
+			  int adc1 = HAL_ADC_GetValue(&hadc1);
+			  HAL_ADC_PollForConversion(&hadc1, 100);
+			  int adc2 = HAL_ADC_GetValue(&hadc1);
+			  HAL_ADC_Stop (&hadc1);
 
-			 HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
+			 sprintf((char*)buf, "voltage: %.2fV current: %.0fmA\r\n", (float)adc2 * 13.2 / 4096,  (float)adc1 * 3300 / 4096);
+
+			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
 
 			 lastTime = currentTime;
 
+		 }
+
+		 if(currentTime - lastTime2 > 1)
+		 {
+			 HAL_UART_Transmit(&huart4, (uint8_t*)"merhaba\n\r", 9, 250);
+			 lastTime2 = currentTime;
 		 }
 
   }
@@ -250,6 +280,67 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 2;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_12;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_11;
+  sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -321,6 +412,39 @@ static void MX_I2C3_Init(void)
 }
 
 /**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 9600;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -336,7 +460,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -397,12 +521,15 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, BUZZER_Pin|Led_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, LORA_M0_Pin|LORA_M1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : BUZZER_Pin Led_Pin */
   GPIO_InitStruct.Pin = BUZZER_Pin|Led_Pin;
@@ -411,17 +538,31 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : LORA_M0_Pin LORA_M1_Pin */
+  GPIO_InitStruct.Pin = LORA_M0_Pin|LORA_M1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
   /*Configure GPIO pins : INT_ACC_Pin INT_GYRO_Pin */
   GPIO_InitStruct.Pin = INT_ACC_Pin|INT_GYRO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI3_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
-
-  HAL_NVIC_SetPriority(EXTI4_IRQn, 1, 1);
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
 }
 
@@ -439,6 +580,39 @@ void bmiBegin()
 	BMI_sensor.deviceConfig.gyro_range = GYRO_RANGE_2000;
 	BMI_sensor.deviceConfig.gyro_powerMode = GYRO_LPM_NORMAL;
 	bmi088_init(&BMI_sensor, &hi2c3);
+}
+
+
+void loraBegin()
+{
+	HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, RESET);
+	HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, SET);
+	HAL_Delay(100);
+	//while(!HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9));
+
+    e22_lora.baudRate = LORA_BAUD_115200;
+    e22_lora.airRate = LORA_AIR_RATE_38_4k;
+    e22_lora.packetSize = LORA_SUB_PACKET_64_BYTES;
+    e22_lora.power = LORA_POWER_37dbm;
+    e22_lora.loraAddress.address16 = 0x0000;
+    e22_lora.loraKey.key16 = 0x0000;
+    e22_lora.channel = 25;
+
+    lora_configure(&e22_lora);
+    /*
+    while(1){
+    	if(__HAL_UART_GET_FLAG(&huart4, UART_FLAG_RXNE) == SET) {
+   		 uint8_t dat[1];
+   		 HAL_UART_Receive(&huart4, (uint8_t *) dat, 1, 100);
+   		 HAL_UART_Transmit(&huart1, (uint8_t *) dat, 1, 100);
+   		 HAL_GPIO_TogglePin(Led_GPIO_Port, Led_Pin);
+   	 }
+    }
+    */
+    HAL_Delay(100);
+
+	HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, RESET);
+	HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, RESET);
 }
 
 

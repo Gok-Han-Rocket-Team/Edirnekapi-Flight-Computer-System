@@ -57,10 +57,18 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define VOLTAGE_SENS_Pin GPIO_PIN_1
+#define VOLTAGE_SENS_GPIO_Port GPIOC
+#define CURRENT_SENS_Pin GPIO_PIN_2
+#define CURRENT_SENS_GPIO_Port GPIOC
 #define BUZZER_Pin GPIO_PIN_12
 #define BUZZER_GPIO_Port GPIOB
 #define Led_Pin GPIO_PIN_13
 #define Led_GPIO_Port GPIOB
+#define LORA_M0_Pin GPIO_PIN_10
+#define LORA_M0_GPIO_Port GPIOC
+#define LORA_M1_Pin GPIO_PIN_11
+#define LORA_M1_GPIO_Port GPIOC
 #define INT_ACC_Pin GPIO_PIN_3
 #define INT_ACC_GPIO_Port GPIOB
 #define INT_ACC_EXTI_IRQn EXTI3_IRQn
