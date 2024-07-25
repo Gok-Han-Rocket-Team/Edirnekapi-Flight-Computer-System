@@ -29,6 +29,7 @@
 #include "algorithms.h"
 #include "queternion.h"
 #include "lora.h"
+#include "usr_gnss_l86_parser.h"
 
 /* USER CODE END Includes */
 
@@ -55,13 +56,14 @@ I2C_HandleTypeDef hi2c3;
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 
 //static BME_280_t BME280_sensor;
 static bmi088_struct_t BMI_sensor;
 static lorastruct e22_lora;
-
+static S_GPS_L86_DATA gnss_data;
 // Free parameters in the Mahony filter and fusion scheme,
 // Kp for proportional feedback, Ki for integral
 
@@ -95,8 +97,9 @@ static void MX_I2C1_Init(void);
 static void MX_I2C3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_UART4_Init(void);
+static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_UART4_Init(void);
 /* USER CODE BEGIN PFP */
 static void bmiBegin();
 static void loraBegin();
@@ -140,21 +143,32 @@ int main(void)
   MX_I2C3_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
-  MX_UART4_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
+  MX_UART4_Init();
   /* USER CODE BEGIN 2 */
   //bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_4);
+
   HAL_NVIC_DisableIRQ(EXTI3_IRQn);
   HAL_NVIC_DisableIRQ(EXTI4_IRQn);
 
+  MX_DMA_Init();
   bmiBegin();
   loraBegin();
+  HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,57600*2C\r\n", 19, 100);
   HAL_UART_DeInit(&huart4);
+  HAL_UART_DeInit(&huart2);
   HAL_Delay(10);
   huart4.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 57600;
   HAL_UART_Init(&huart4);
+  HAL_UART_Init(&huart2);
+  UsrGpsL86Init(&huart2);
   HAL_Delay(200);
-  //HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,38400*27\r\n", strlen("$PMTK251,38400*27\r\n"), 100);
+
+//Bu makro gps verisini gözlemlemek içindir.
+//	VIEW_GPS()
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -167,7 +181,8 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	  //bme280_update();
-	  bmi088_update();
+	  //bmi088_update();
+	  Usr_GpsL86GetValues(&gnss_data);
 
 #if defined(ALGORITHM_1)
 	  algorithm_1_update(&BME280_sensor, algorithm_1_stat);
@@ -227,7 +242,9 @@ int main(void)
 
 		 if(currentTime - lastTime2 > 1)
 		 {
-			 HAL_UART_Transmit(&huart4, (uint8_t*)"merhaba\n\r", 9, 250);
+			 //HAL_UART_Transmit(&huart4, (uint8_t*)"merhaba\n\r", 9, 250);
+			 sprintf((char*)buf, "lat:%f\tlong:%f\ttime:%.0f\tsat:%d\r\n", gnss_data.lat, gnss_data.lon, gnss_data.timeDateBuf, gnss_data.satInUse);
+			 HAL_UART_Transmit(&huart4, buf, strlen((char*) buf), 250);
 			 lastTime2 = currentTime;
 		 }
 
@@ -460,7 +477,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
+  huart1.Init.BaudRate = 115200;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -493,7 +510,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 38400;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -507,6 +524,22 @@ static void MX_USART2_UART_Init(void)
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
 
 }
 
