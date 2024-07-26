@@ -60,10 +60,11 @@ DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 
-//static BME_280_t BME280_sensor;
+static BME_280_t BME280_sensor;
 static bmi088_struct_t BMI_sensor;
 static lorastruct e22_lora;
 static S_GPS_L86_DATA gnss_data;
+power guc;
 // Free parameters in the Mahony filter and fusion scheme,
 // Kp for proportional feedback, Ki for integral
 
@@ -103,6 +104,7 @@ static void MX_UART4_Init(void);
 /* USER CODE BEGIN PFP */
 static void bmiBegin();
 static void loraBegin();
+void measurePower(power *guc);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -147,13 +149,12 @@ int main(void)
   MX_ADC1_Init();
   MX_UART4_Init();
   /* USER CODE BEGIN 2 */
-  //bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_4);
 
   HAL_NVIC_DisableIRQ(EXTI3_IRQn);
   HAL_NVIC_DisableIRQ(EXTI4_IRQn);
 
-  MX_DMA_Init();
   bmiBegin();
+  bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_4);
   loraBegin();
   HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,57600*2C\r\n", 19, 100);
   HAL_UART_DeInit(&huart4);
@@ -180,9 +181,10 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  //bme280_update();
+	  bme280_update();
 	  //bmi088_update();
 	  Usr_GpsL86GetValues(&gnss_data);
+	  measurePower(&guc);
 
 #if defined(ALGORITHM_1)
 	  algorithm_1_update(&BME280_sensor, algorithm_1_stat);
@@ -225,14 +227,7 @@ int main(void)
 			 //sprintf((char*)buf, "v[0]: %f  v[1]: %f  v[2]: %f   teta: %f\r\n", vector[0], vector[1], vector[2], (180.0 / M_PI) * atan2(sqrt(pow(vector[0],2.0) + pow(vector[1],2.0)), vector[2]));
 			 //sprintf((char*)buf, "teta: %f\r\n", (180.0 / M_PI) * atan2(sqrt(pow(BMI_sensor.acc_x,2.0) + pow(BMI_sensor.acc_y,2.0)), BMI_sensor.acc_z));
 			 //sprintf((char*)buf, "A %f %f %f\r\n", yaw,  -roll, pitch);
-			  HAL_ADC_Start(&hadc1);
-			  HAL_ADC_PollForConversion(&hadc1, 100);
-			  int adc1 = HAL_ADC_GetValue(&hadc1);
-			  HAL_ADC_PollForConversion(&hadc1, 100);
-			  int adc2 = HAL_ADC_GetValue(&hadc1);
-			  HAL_ADC_Stop (&hadc1);
 
-			 sprintf((char*)buf, "voltage: %.2fV current: %.0fmA\r\n", (float)adc2 * 13.2 / 4096,  (float)adc1 * 3300 / 4096);
 
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
 
@@ -243,8 +238,10 @@ int main(void)
 		 if(currentTime - lastTime2 > 1)
 		 {
 			 //HAL_UART_Transmit(&huart4, (uint8_t*)"merhaba\n\r", 9, 250);
-			 sprintf((char*)buf, "lat:%f\tlong:%f\ttime:%.0f\tsat:%d\r\n", gnss_data.lat, gnss_data.lon, gnss_data.timeDateBuf, gnss_data.satInUse);
-			 HAL_UART_Transmit(&huart4, buf, strlen((char*) buf), 250);
+			 //sprintf((char*)buf, "lat:%f\tlong:%f\ttime:%.0f\tsat:%d\r\n", gnss_data.lat, gnss_data.lon, gnss_data.timeDateBuf, gnss_data.satInUse);
+			 sprintf((char*)buf, "struct byte = %d\r\n", sizeof(union DataPack));
+			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
+			 loraAddDatas(&huart1, &BMI_sensor, &BME280_sensor, &gnss_data, &guc);
 			 lastTime2 = currentTime;
 		 }
 
@@ -648,6 +645,19 @@ void loraBegin()
 	HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, RESET);
 }
 
+
+void measurePower(power *guc_)
+{
+	  HAL_ADC_Start(&hadc1);
+	  HAL_ADC_PollForConversion(&hadc1, 100);
+	  int adc1 = HAL_ADC_GetValue(&hadc1);
+	  HAL_ADC_PollForConversion(&hadc1, 100);
+	  int adc2 = HAL_ADC_GetValue(&hadc1);
+	  HAL_ADC_Stop (&hadc1);
+
+	  guc_->akim =   (float)adc1 * 3300 / 4096;
+	  guc_->voltaj = (float)adc2 * 13.2 / 4096;
+}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
