@@ -1,0 +1,7 @@
+../Core/Src/bmi088.c:31:13:bmi088_selfTest	40	static
+../Core/Src/bmi088.c:85:6:bmi088_init	40	static
+../Core/Src/bmi088.c:207:6:bmi088_update	64	static
+../Core/Src/bmi088.c:286:6:bmi088_getAccelDatas_INT	4	static
+../Core/Src/bmi088.c:291:6:bmi088_getGyroDatas_INT	4	static
+../Core/Src/bmi088.c:296:9:bmi088_getGyroChipId	32	static
+../Core/Src/bmi088.c:303:6:getOffset	344	static

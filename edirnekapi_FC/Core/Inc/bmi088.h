@@ -164,6 +164,19 @@ extern float roll, pitch, yaw;
 #define GYRO_Y_OFFSET			(double)-0.20
 #define GYRO_Z_OFFSET			(double)0.016
 #endif
+
+#ifdef CARD_2
+#define ACCEL_Z_OFFSET 			(double)0.0
+#define ACCEL_Y_OFFSET 			(double)0.0
+#define ACCEL_X_OFFSET 			(double)0.0
+#define GYRO_X_OFFSET			(double)0.0
+#define GYRO_Y_OFFSET			(double)-0.20
+#define GYRO_Z_OFFSET			(double)0.016
+#endif
+//Functions
+
+
+
 //Functions
 
 typedef struct bmi088_raw

@@ -30,7 +30,7 @@
 #include "queternion.h"
 #include "lora.h"
 #include "usr_gnss_l86_parser.h"
-
+#include "dataPacking.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +56,7 @@ I2C_HandleTypeDef hi2c3;
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
@@ -64,13 +65,13 @@ static BME_280_t BME280_sensor;
 static bmi088_struct_t BMI_sensor;
 static lorastruct e22_lora;
 static S_GPS_L86_DATA gnss_data;
-power guc;
+static power guc;
 // Free parameters in the Mahony filter and fusion scheme,
 // Kp for proportional feedback, Ki for integral
 
 
 extern int errorLine;
-
+extern _f g_GnssRx_Flag;
 float currentTime = 0;
 float lastTime =0;
 float lastTime2 =0;
@@ -153,10 +154,12 @@ int main(void)
   HAL_NVIC_DisableIRQ(EXTI3_IRQn);
   HAL_NVIC_DisableIRQ(EXTI4_IRQn);
 
+
   bmiBegin();
-  bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_4);
+  bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_8);
   loraBegin();
   HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,57600*2C\r\n", 19, 100);
+  //HAL_UART_Transmit(&huart2, "$PMTK251,9600*17\r\n", 18, 100);				// 9600 bps
   HAL_UART_DeInit(&huart4);
   HAL_UART_DeInit(&huart2);
   HAL_Delay(10);
@@ -164,11 +167,15 @@ int main(void)
   huart2.Init.BaudRate = 57600;
   HAL_UART_Init(&huart4);
   HAL_UART_Init(&huart2);
+  HAL_DMA_Init(&hdma_usart1_tx);
+  HAL_DMA_Init(&hdma_usart2_rx);
+   // Timer'ı başlat
+
+  //Bu makro gps verisini gözlemlemek içindir.
+  //VIEW_GPS()
   UsrGpsL86Init(&huart2);
   HAL_Delay(200);
 
-//Bu makro gps verisini gözlemlemek içindir.
-//	VIEW_GPS()
 
   /* USER CODE END 2 */
 
@@ -182,8 +189,8 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	  bme280_update();
-	  //bmi088_update();
-	  Usr_GpsL86GetValues(&gnss_data);
+	  bmi088_update();
+
 	  measurePower(&guc);
 
 #if defined(ALGORITHM_1)
@@ -205,9 +212,8 @@ int main(void)
 
 	  currentTime = ((float)HAL_GetTick()) / 1000.0;
 
-		 if(currentTime - lastTime > 0.2)
+		 if(fabs(currentTime - lastTime) > 0.2)
 		 {
-
 			 //sprintf((char*)buf, "temp = %.2fC  time %.0fuS A_x: %.1fmG  A_y: %.1fm  A_z: %.1fmG   G_z: %fdps\r\n", BMI_sensor.temp, BMI_sensor.currentTime, BMI_sensor.acc_x, BMI_sensor.acc_y, BMI_sensor.acc_z, BMI_sensor.gyro_z);
 			 //sprintf((char*)buf, "G_x: %f  G_y: %f  G_z: %f   \r\n", BMI_sensor.gyro_x_angle, BMI_sensor.gyro_y_angle, BMI_sensor.gyro_z_angle);
 			 //sprintf((char*)buf, "counter = %d  A_x: %.0f   A_y: %.0f   A_z: %.0f\r\n", counter, BMI_sensor.acc_x, BMI_sensor.acc_y, BMI_sensor.acc_z);
@@ -235,15 +241,26 @@ int main(void)
 
 		 }
 
-		 if(currentTime - lastTime2 > 1)
+		 if(fabs(currentTime - lastTime2) > 1)
 		 {
 			 //HAL_UART_Transmit(&huart4, (uint8_t*)"merhaba\n\r", 9, 250);
 			 //sprintf((char*)buf, "lat:%f\tlong:%f\ttime:%.0f\tsat:%d\r\n", gnss_data.lat, gnss_data.lon, gnss_data.timeDateBuf, gnss_data.satInUse);
-			 sprintf((char*)buf, "struct byte = %d\r\n", sizeof(union DataPack));
+
+			 //sprintf((char*)buf, "acc counter: %d  dt:%f\r\n", counterAcc, BMI_sensor.deltaTime);
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
-			 loraAddDatas(&huart1, &BMI_sensor, &BME280_sensor, &gnss_data, &guc);
+			 //counterAcc = 0;
+
+			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc);
+			 printDatas();
 			 lastTime2 = currentTime;
 		 }
+		 if(g_GnssRx_Flag)
+		 {
+			 Usr_GpsL86GetValues(&gnss_data);
+			 //printDatas();
+		 }
+
+
 
   }
 
@@ -532,11 +549,15 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 
@@ -588,10 +609,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
-  HAL_NVIC_SetPriority(EXTI4_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
 }
@@ -601,12 +622,12 @@ void bmiBegin()
 {
 	//Acccel config
 	BMI_sensor.deviceConfig.acc_bandwith = ACC_BWP_OSR4;
-	BMI_sensor.deviceConfig.acc_outputDateRate = ACC_ODR_400;
+	BMI_sensor.deviceConfig.acc_outputDateRate = ACC_ODR_200;
 	BMI_sensor.deviceConfig.acc_powerMode = ACC_PWR_SAVE_ACTIVE;
 	BMI_sensor.deviceConfig.acc_range = ACC_RANGE_12G;
 
 	//Gyro config
-	BMI_sensor.deviceConfig.gyro_bandWidth = GYRO_BW_64;
+	BMI_sensor.deviceConfig.gyro_bandWidth = GYRO_BW_230;
 	BMI_sensor.deviceConfig.gyro_range = GYRO_RANGE_2000;
 	BMI_sensor.deviceConfig.gyro_powerMode = GYRO_LPM_NORMAL;
 	bmi088_init(&BMI_sensor, &hi2c3);
@@ -649,9 +670,9 @@ void loraBegin()
 void measurePower(power *guc_)
 {
 	  HAL_ADC_Start(&hadc1);
-	  HAL_ADC_PollForConversion(&hadc1, 100);
+	  HAL_ADC_PollForConversion(&hadc1, 10);
 	  int adc1 = HAL_ADC_GetValue(&hadc1);
-	  HAL_ADC_PollForConversion(&hadc1, 100);
+	  HAL_ADC_PollForConversion(&hadc1, 10);
 	  int adc2 = HAL_ADC_GetValue(&hadc1);
 	  HAL_ADC_Stop (&hadc1);
 
@@ -669,7 +690,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     if(GPIO_Pin == INT_ACC_Pin)
     {
     	bmi088_getAccelDatas_INT();
-    	//counterAcc++;
+    	counterAcc++;
     }
 }
 /* USER CODE END 4 */
@@ -682,19 +703,17 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-	HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
-	HAL_Delay(100);
-	HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
 
 	sprintf((char*)buf, "error line: %d\r\n", errorLine);
 	HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
- /*
+
 	__disable_irq();
   while (1)
   {
-
+		HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
+		HAL_Delay(100);
   }
-  */
+
   /* USER CODE END Error_Handler_Debug */
 }
 

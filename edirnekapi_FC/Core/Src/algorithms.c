@@ -49,9 +49,9 @@ void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat)
   {
 	  float currentAltitude = BME->altitude;
 	  BME->velocity = (currentAltitude - lastAltitude_1) / (currentTime_1 - lastTime_1);
-	  sprintf((char*)buffer_alg, "dikey hiz: %.0f\tirtifa: %.0f\r\n", BME->velocity, BME->altitude);
+	  //sprintf((char*)buffer_alg, "dikey hiz: %.0f\tirtifa: %.0f\r\n", BME->velocity, BME->altitude);
 	  //sprintf((char*)buffer_alg, "hello\r\n");
-	  HAL_UART_Transmit(&huart1, buffer_alg, strlen((char*)buffer_alg), 50);
+	  //HAL_UART_Transmit(&huart1, buffer_alg, strlen((char*)buffer_alg), 50);
 	  lastAltitude_1 = currentAltitude;
 	  lastTime_1 = currentTime_1;
 	  isUpdated_1 = 1;

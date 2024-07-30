@@ -1,7 +1,7 @@
 #include "lora.h"
 #include "main.h"
 
-union DataPack veriler;
+
 
 static void send_command(uint8_t header, uint8_t addresses, uint8_t dataLength, uint8_t *data) {
     uint8_t command[12];
@@ -13,7 +13,6 @@ static void send_command(uint8_t header, uint8_t addresses, uint8_t dataLength, 
     }
 
     HAL_UART_Transmit(&huart4, command, 12, 100);
-
 }
 
 void lora_configure(lorastruct *config)
@@ -63,68 +62,7 @@ void lora_configure(lorastruct *config)
     send_command(0xC0, 0x00, 0x09, data);
 }
 
-void loraSend()
-{
 
-}
-
-
-static void calculateCRC()
-{
-	uint8_t checkSum = 0;
-	for(int i = 1; i < 53; i++)
-	{
-		checksum ^= veriler.arr[i];
-	}
-	return checkSum;
-}
-
-void loraAddDatas(UART_HandleTypeDef *loraUart, bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power *guc)
-{
-	uint8_t durum = 1; //********************************
-
-	veriler.dataYapi.basla = 0xFF;
-
-	uint8_t min = 0;
-	uint8_t sec = 0;
-	int gpsTime = (int)gps->timeDateBuf;
-	sec = gpsTime % 100;
-	gpsTime /= 100;
-	min = gpsTime % 100;
-	min = (min << 2) | (sec >> 4);
-	sec = (sec << 4) | (durum);
-	veriler.dataYapi.zaman = min;
-	veriler.dataYapi.durum = sec;
-
-	veriler.dataYapi.voltaj = (uint16_t)(guc->voltaj * 100);
-	veriler.dataYapi.akim = (uint16_t)(int)(guc->akim);
-
-	veriler.dataYapi.sicaklik = (uint8_t)(int)(bme->temperature * 5);
-	veriler.dataYapi.nem = (uint8_t)(int)(bme->humidity);
-
-	veriler.dataYapi.yukseklik_p = bme->altitude;
-	veriler.dataYapi.yukseklik_gps = gps->altitudeInMeter;
-
-	veriler.dataYapi.lat = gps->lat;
-	veriler.dataYapi.lon = gps->lon;
-
-	veriler.dataYapi.gyroX = bmi->gyro_x;
-	veriler.dataYapi.gyroY = bmi->gyro_y;
-	veriler.dataYapi.gyroZ = bmi->gyro_z;
-
-	veriler.dataYapi.accX = bmi->acc_x / 1000;
-	veriler.dataYapi.accY = bmi->acc_y / 1000;
-	veriler.dataYapi.accZ = bmi->acc_z / 1000;
-
-	veriler.dataYapi.aci = 50;
-	veriler.dataYapi.checkSum = calculateCRC();
-	veriler.dataYapi.CR	= '\r';
-	veriler.dataYapi.CR	= '\n';
-
-	uint8_t buf[100];
-	sprintf((char*)buf, "%f %f\r\n", veriler.dataYapi.yukseklik_p, veriler.dataYapi.yukseklik_gps);
-	HAL_UART_Transmit(loraUart, buf, strlen((char*) buf) - 1, 250);
-}
 
 
 

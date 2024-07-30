@@ -20,7 +20,6 @@ int errorLine = 0;
 int offsetCounter = 0;
 double g[2][3];		//Offset Values.
 
-float roll, pitch, yaw;
 
 extern UART_HandleTypeDef huart1;
 
@@ -36,6 +35,7 @@ static void bmi088_selfTest()
 	HAL_StatusTypeDef retVal = HAL_OK;
 
 	uint8_t buf[1];
+
 	buf[0] = ACC_RESET;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // Accel reset
 	HAL_Delay(100);
@@ -84,6 +84,7 @@ static void bmi088_selfTest()
 
 void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 {
+	quaternionSet_zero();
 	HAL_StatusTypeDef retVal = HAL_OK;
 	bmi_I2C = I2C_;
 	BMI = BMI_;
@@ -103,13 +104,20 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 
 	HAL_Delay(10);
 
+	buf[0] = 0x01;
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_PWR_CONF, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // power save ultra
+
+	buf[0] = ACC_DISABLE;
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_PWR_CTRL, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // accel disable
+	HAL_Delay(20);
+
 	buf[0] = ACC_RESET;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // Accel reset
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 	HAL_Delay(40);
 
 	buf[0] = FIFO_RESET;
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // Accel reset
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // FIFO reset
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 	HAL_Delay(40);
 
@@ -118,6 +126,9 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 	HAL_Delay(40);
 
+	HAL_I2C_DeInit(bmi_I2C);  // I2C arayüzünü de-initialize edin
+	HAL_I2C_Init(bmi_I2C);    // I2C arayüzünü yeniden initialize edin
+/*
 	//accel interrupt renew
 	buf[0] = (0x00);
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_INT1_IO_CTRL, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //accel interrupt config.
@@ -126,8 +137,8 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 	buf[0] = (0x00);
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_INT_MAP_DATA, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //accel interrupt DRDY map to pin1.
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
-
 	HAL_Delay(40);
+*/
 
 	//Gyroscope configuration.
 	buf[0] = BMI->deviceConfig.gyro_range;
@@ -226,6 +237,8 @@ void bmi088_update()
 		//BMI->vel_y = ((float)acc_y_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_Y_OFFSET) * BMI->deltaTime;
 		//BMI->vel_x = ((float)acc_x_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_X_OFFSET) * BMI->deltaTime;
 
+		BMI->deltaTime = BMI->currentTime - BMI->lastTime < 0 ? 0.0 : BMI->currentTime - BMI->lastTime;
+		BMI->lastTime = BMI->currentTime;
 
 		BMI->rawDatas.isAccelUpdated = 0;
 		isTimeUpdated = 1;
@@ -239,9 +252,6 @@ void bmi088_update()
 			int16_t gyro_z_16 = (BMI->rawDatas.gyro[5] << 8) | BMI->rawDatas.gyro[4];
 			int16_t gyro_y_16 = (BMI->rawDatas.gyro[3] << 8) | BMI->rawDatas.gyro[2];
 			int16_t gyro_x_16 = (BMI->rawDatas.gyro[1] << 8) | BMI->rawDatas.gyro[0];
-
-			BMI->deltaTime = BMI->currentTime - BMI->lastTime;
-			BMI->lastTime = BMI->currentTime;
 
 			/*
 			BMI->delta_angle_z = (((float)gyro_z_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_Z_OFFSET) * BMI->deltaTime;
@@ -259,9 +269,8 @@ void bmi088_update()
 			//update_quaternion(q, BMI->gyro_x, BMI->gyro_y, BMI->gyro_z, BMI->deltaTime);
 			//calculateQuaternion(q, BMI->gyro_x, BMI->gyro_y, BMI->gyro_z, BMI->deltaTime, vector);
 
-
 			updateQuaternion(BMI->gyro_x * M_PI / 180.0, BMI->gyro_y * M_PI / 180.0, BMI->gyro_z * M_PI / 180.0, BMI->deltaTime);
-			quaternionToEuler(&roll, &pitch, &yaw);
+			quaternionToEuler();
 
 			BMI->rawDatas.isGyroUpdated = 0;
 			isTimeUpdated = 0;

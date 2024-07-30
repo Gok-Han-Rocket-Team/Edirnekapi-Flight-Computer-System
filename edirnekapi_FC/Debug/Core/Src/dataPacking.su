@@ -1,0 +1,4 @@
+../Core/Src/dataPacking.c:6:16:calculateCRC	16	static
+../Core/Src/dataPacking.c:15:13:sendRF	8	static
+../Core/Src/dataPacking.c:20:6:packDatas	40	static
+../Core/Src/dataPacking.c:72:6:printDatas	328	static

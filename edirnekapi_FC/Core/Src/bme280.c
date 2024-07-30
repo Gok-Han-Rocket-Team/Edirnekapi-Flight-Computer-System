@@ -52,7 +52,13 @@ HAL_StatusTypeDef bme280_init(BME_280_t* BME_sensor,  I2C_HandleTypeDef* I2C_bme
 
 	uint8_t params[25];
 
-	HAL_StatusTypeDef retVal = HAL_I2C_Mem_Read(I2C_bme, BME280_ADD, BME280_PARAM1_START, I2C_MEMADD_SIZE_8BIT, params, 25, 200);
+	HAL_StatusTypeDef retVal;
+
+	uint8_t resetData = BME280_SOFT_RESET;
+	retVal = HAL_I2C_Mem_Write(I2C_bme, BME280_ADD, BME280_RESET, I2C_MEMADD_SIZE_8BIT, &resetData, 1, 50);		//Soft Reset.
+	HAL_Delay(50);
+
+	retVal = HAL_I2C_Mem_Read(I2C_bme, BME280_ADD, BME280_PARAM1_START, I2C_MEMADD_SIZE_8BIT, params, 25, 200);
 	BME->parameters.dig_T1 = params[0] | (uint16_t)(params[1] << 8);
 	BME->parameters.dig_T2 = params[2] | ((int16_t)params[3] << 8);
 	BME->parameters.dig_T3 = params[4] | ((int16_t)params[5] << 8);
