@@ -34,8 +34,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Inc/algorithms.h ../Core/Inc/bmi088.h ../Core/Inc/bme280.h \
  ../Core/Inc/queternion.h ../Core/Inc/lora.h \
  ../Core/Inc/usr_gnss_l86_parser.h ../Core/Inc/usr_gnssGeneral.h \
- ../Core/Inc/dataPacking.h ../Core/Inc/usr_gnss_l86_parser.h \
- ../Core/Inc/dataPacking.h
+ ../Core/Inc/dataPacking.h ../Core/Inc/algorithms.h \
+ ../Core/Inc/usr_gnss_l86_parser.h ../Core/Inc/dataPacking.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -79,5 +79,6 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/usr_gnss_l86_parser.h:
 ../Core/Inc/usr_gnssGeneral.h:
 ../Core/Inc/dataPacking.h:
+../Core/Inc/algorithms.h:
 ../Core/Inc/usr_gnss_l86_parser.h:
 ../Core/Inc/dataPacking.h:

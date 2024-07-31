@@ -1,3 +1,3 @@
 ../Core/Src/algorithms.c:34:15:sqr	16	static
-../Core/Src/algorithms.c:43:6:algorithm_1_update	24	static
-../Core/Src/algorithms.c:133:6:algorithm_2_update	160	static
+../Core/Src/algorithms.c:45:6:algorithm_1_update	24	static
+../Core/Src/algorithms.c:106:6:algorithm_2_update	32	static

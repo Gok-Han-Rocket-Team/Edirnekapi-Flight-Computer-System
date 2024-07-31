@@ -40,6 +40,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define ALGORITHM_2
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -56,6 +57,7 @@ I2C_HandleTypeDef hi2c3;
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_uart4_tx;
 DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
 
@@ -69,25 +71,32 @@ static power guc;
 // Free parameters in the Mahony filter and fusion scheme,
 // Kp for proportional feedback, Ki for integral
 
+extern float euler[3];
 
-extern int errorLine;
 extern _f g_GnssRx_Flag;
 float currentTime = 0;
 float lastTime =0;
 float lastTime2 =0;
+float powerLastTime = 0;
+float loraLastTime = 0;
+float lora_hz = 1.0;
+
+
+extern int errorLine;
 
 int counter = 0;
 int counterAcc = 0;
 int counterGy = 0;
+
 uint8_t buf[250];
+uint8_t rocketStatus = 255;
+
 
 
 #if defined(ALGORITHM_1)
 static algorithmStatus algorithm_1_stat[2];
 #endif
-#if defined(ALGORITHM_2)
-static algorithmStatus algorithm_2_stat[2];
-#endif
+
 
 
 /* USER CODE END PV */
@@ -106,6 +115,7 @@ static void MX_UART4_Init(void);
 static void bmiBegin();
 static void loraBegin();
 void measurePower(power *guc);
+void getWatt(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -154,7 +164,9 @@ int main(void)
   HAL_NVIC_DisableIRQ(EXTI3_IRQn);
   HAL_NVIC_DisableIRQ(EXTI4_IRQn);
 
-
+  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
+  HAL_Delay(500);
+  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
   bmiBegin();
   bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_8);
   loraBegin();
@@ -165,16 +177,18 @@ int main(void)
   HAL_Delay(10);
   huart4.Init.BaudRate = 115200;
   huart2.Init.BaudRate = 57600;
-  HAL_UART_Init(&huart4);
-  HAL_UART_Init(&huart2);
+  HAL_UART_Init(&huart4);					//telemetri
+  HAL_UART_Init(&huart2);					//GNSS
   HAL_DMA_Init(&hdma_usart1_tx);
   HAL_DMA_Init(&hdma_usart2_rx);
+  HAL_DMA_Init(&hdma_uart4_tx);
    // Timer'ı başlat
 
   //Bu makro gps verisini gözlemlemek içindir.
   //VIEW_GPS()
   UsrGpsL86Init(&huart2);
   HAL_Delay(200);
+  rocketStatus = STAT_ROCKET_READY;
 
 
   /* USER CODE END 2 */
@@ -190,14 +204,13 @@ int main(void)
 
 	  bme280_update();
 	  bmi088_update();
-
 	  measurePower(&guc);
 
 #if defined(ALGORITHM_1)
 	  algorithm_1_update(&BME280_sensor, algorithm_1_stat);
 #endif
 #if defined(ALGORITHM_2)
-	  algorithm_2_update(&BME280_sensor, &BMI_sensor, algorithm_2_stat);
+	  algorithm_2_update(&BME280_sensor, &BMI_sensor, euler[1]);
 #endif
 
 
@@ -209,6 +222,9 @@ int main(void)
 		 HAL_GPIO_TogglePin(Led_GPIO_Port, Led_Pin);
 	 }
 */
+
+	  if(rocketStatus == STAT_FLIGHT_STARTED)
+		  lora_hz = 5;
 
 	  currentTime = ((float)HAL_GetTick()) / 1000.0;
 
@@ -250,14 +266,27 @@ int main(void)
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
 			 //counterAcc = 0;
 
-			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc);
-			 printDatas();
+
 			 lastTime2 = currentTime;
 		 }
+
 		 if(g_GnssRx_Flag)
 		 {
 			 Usr_GpsL86GetValues(&gnss_data);
 			 //printDatas();
+		 }
+
+
+
+		 //Lora timer;
+		 currentTime = ((float)HAL_GetTick()) / 1000.0;
+
+		 if(fabs(currentTime - loraLastTime) > (1.0 / lora_hz))
+		 {
+			 getWatt();
+			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc, rocketStatus);
+			 printDatas();
+			 loraLastTime = currentTime;
 		 }
 
 
@@ -552,6 +581,9 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
@@ -678,7 +710,16 @@ void measurePower(power *guc_)
 
 	  guc_->akim =   (float)adc1 * 3300 / 4096;
 	  guc_->voltaj = (float)adc2 * 13.2 / 4096;
+	  guc_->mWatt += guc_->akim * guc_->voltaj * (((float)HAL_GetTick() / 1000) - powerLastTime);
+	  powerLastTime = (float)HAL_GetTick() / 1000;
 }
+
+void getWatt()
+{
+	guc.mWatt_s = guc.mWatt;
+	guc.mWatt = 0.0;
+}
+
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

@@ -37,9 +37,11 @@ static double sqr(double nmbr)
 }
 
 
-//it works only with BME280 pressure sensor. Measures the vertical velocity.
-//it detects the first deplo
-//it detecets the second deploy via altitude
+/*
+ * it works only with BME280 pressure sensor. Measures the vertical velocity.
+ * it detects the first deploy
+ * it detecets the second deploy via altitude
+ */
 void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat)
 {
 
@@ -49,9 +51,6 @@ void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat)
   {
 	  float currentAltitude = BME->altitude;
 	  BME->velocity = (currentAltitude - lastAltitude_1) / (currentTime_1 - lastTime_1);
-	  //sprintf((char*)buffer_alg, "dikey hiz: %.0f\tirtifa: %.0f\r\n", BME->velocity, BME->altitude);
-	  //sprintf((char*)buffer_alg, "hello\r\n");
-	  //HAL_UART_Transmit(&huart1, buffer_alg, strlen((char*)buffer_alg), 50);
 	  lastAltitude_1 = currentAltitude;
 	  lastTime_1 = currentTime_1;
 	  isUpdated_1 = 1;
@@ -75,14 +74,6 @@ void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat)
 	  if(risingCounter == 3 && isRising == 0 && isFalling == 0 )
 	  {
 		  isRising = 1;
-		  /*
-		  HAL_GPIO_WritePin(Ld3_GPIO_Port, Ld3_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(Ld10_GPIO_Port, Ld10_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(Ld6_GPIO_Port, Ld6_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld7_GPIO_Port, Ld7_Pin, GPIO_PIN_SET);
-		  */
-		  sprintf((char*)buffer_alg, "\n\n\n\n***********   RISING   ***********\n\n\n\n\r\n");
-		  HAL_UART_Transmit(&huart1, buffer_alg, strlen((char*)buffer_alg), 50);
 	  }
 
 	  //falling detection
@@ -99,103 +90,50 @@ void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat)
 	  {
 		  isFalling = 1;
 		  stat[0] = 1;
-		  /*
-		  HAL_GPIO_WritePin(Ld3_GPIO_Port, Ld3_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld10_GPIO_Port, Ld10_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld6_GPIO_Port, Ld6_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(Ld7_GPIO_Port, Ld7_Pin, GPIO_PIN_RESET);
-		  */
-		  sprintf((char*)buffer_alg, "\n\n\n\n***********   FALLING, FIRST PARACHUTE   ***********\n\n\n\n\n\r\n");
-		  HAL_UART_Transmit(&huart1, buffer_alg, strlen((char*)buffer_alg), 50);
 	  }
 
 	  //second parachute
 	  if(isFalling == 1 && BME->altitude < SECOND_DEPLOY_ALTITUDE && stat[1] == 0)
 	  {
 		  stat[1] = 1;
-		  /*
-		  HAL_GPIO_WritePin(Ld3_GPIO_Port, Ld3_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld4_GPIO_Port, Ld4_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld5_GPIO_Port, Ld5_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld6_GPIO_Port, Ld6_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld7_GPIO_Port, Ld7_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld8_GPIO_Port, Ld8_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld9_GPIO_Port, Ld9_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld10_GPIO_Port, Ld10_Pin, GPIO_PIN_SET);
-		  */
-		  sprintf((char*)buffer_alg, "\n\n\n\n***********   SECOND PARACHUTE   ***********\n\n\n\n\r\n");
-		  HAL_UART_Transmit(&huart1, buffer_alg, strlen((char*)buffer_alg), 50);
 	  }
   }
 
 
 }
-void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, algorithmStatus* stat)
+
+
+void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 {
-
-	uint8_t buf[100];
-	currentTime_2 = (float)HAL_GetTick() / 1000.0;
-
-	  float teta = atan(sqrt(BMI->acc_x * BMI->acc_x + BMI->acc_y * BMI->acc_y) / BMI->acc_z) * 180.0 / M_PI;
-	  if( teta < 0)
-	  {
-		teta = teta + 180.0 ;
-	  }
-
-	if(fabs(currentTime_2 - lastTime_2) > 0.1)
-	{
-		sprintf((char*)buf, "irtifa: %0.f ivme: %.0f  aci: %.0f\r\n", BME->altitude, sqrtf(sqr(BMI->acc_x) + sqr(BMI->acc_y) + sqr(BMI->acc_z)), teta);
-		HAL_UART_Transmit(&huart1, buf, strlen((char*)buf), 50);
-		lastTime_2 = currentTime_2;
-	}
-
 	//Rising detection
 	if((sqrtf(sqr(BMI->acc_x) + sqr(BMI->acc_y) + sqr(BMI->acc_z)) > RISING_G_TRESHOLD) && isRising_2 == 0)
 	{
-		stat[0] = 1;
+		if(BME->altitude < 200.0 && BME->altitude > -200.0){
+			BME->baseAltitude = BME->altitude + BME->baseAltitude;
+		}
+
 		isRising_2 = 1;
-		sprintf((char*)buf, "\n\n\n\n***********   RISING   ***********\n\n\n\n\r\n");
-		HAL_UART_Transmit(&huart1, buf, strlen((char*)buf), 50);
-		/*
-		  HAL_GPIO_WritePin(Ld3_GPIO_Port, Ld3_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(Ld10_GPIO_Port, Ld10_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(Ld6_GPIO_Port, Ld6_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(Ld7_GPIO_Port, Ld7_Pin, GPIO_PIN_SET);
-		  */
+		rocketStatus = rocketStatus < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : rocketStatus;
 	}
 
-	//falling detction
-	if(isRising_2 == 1 && (teta > 70) && isFalling_2 == 0 && BME->altitude > 500)
+	//falling detection
+	if((fabs(angle) > 85) && isRising_2 == 1 && isFalling_2 == 0 && BME->altitude > ARMING_ALTITUDE)
 	{
-		stat[0] = 1;
 		isFalling_2 = 1;
-		sprintf((char*)buf, "\n\n\n\n***********   FALLING, FIRST PARACHUTE   ***********\n\n\n\n\n\r\n");
-		HAL_UART_Transmit(&huart1, buf, strlen((char*)buf), 50);
-		/*
-		HAL_GPIO_WritePin(Ld3_GPIO_Port, Ld3_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(Ld10_GPIO_Port, Ld10_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(Ld6_GPIO_Port, Ld6_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(Ld7_GPIO_Port, Ld7_Pin, GPIO_PIN_RESET);
-		*/
+		rocketStatus = rocketStatus < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : rocketStatus;
 	}
 
-	//second parachute
-	if(isFalling_2 == 1 && BME->altitude < SECOND_DEPLOY_ALTITUDE && stat[1] == 0)
+	//Second Parachute
+	static int secondP_counter = 0;
+	if(BME->altitude < SECOND_DEPLOY_ALTITUDE && isFalling_2 == 1 && rocketStatus < STAT_P1_OK_P2_OK)
+		secondP_counter++;
+
+	if(secondP_counter > 10)
 	{
-	  stat[1] = 1;
-	  /*
-	  HAL_GPIO_WritePin(Ld3_GPIO_Port, Ld3_Pin, GPIO_PIN_SET);
-	  HAL_GPIO_WritePin(Ld4_GPIO_Port, Ld4_Pin, GPIO_PIN_SET);
-	  HAL_GPIO_WritePin(Ld5_GPIO_Port, Ld5_Pin, GPIO_PIN_SET);
-	  HAL_GPIO_WritePin(Ld6_GPIO_Port, Ld6_Pin, GPIO_PIN_SET);
-	  HAL_GPIO_WritePin(Ld7_GPIO_Port, Ld7_Pin, GPIO_PIN_SET);
-	  HAL_GPIO_WritePin(Ld8_GPIO_Port, Ld8_Pin, GPIO_PIN_SET);
-	  HAL_GPIO_WritePin(Ld9_GPIO_Port, Ld9_Pin, GPIO_PIN_SET);
-	  HAL_GPIO_WritePin(Ld10_GPIO_Port, Ld10_Pin, GPIO_PIN_SET);
-	  */
-	  sprintf((char*)buf, "\n\n\n\n***********   SECOND PARACHUTE   ***********\n\n\n\n\r\n");
-	  HAL_UART_Transmit(&huart1, buf, strlen((char*)buf), 50);
+		rocketStatus = rocketStatus < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : rocketStatus;
 	}
+
+
 }
 
 

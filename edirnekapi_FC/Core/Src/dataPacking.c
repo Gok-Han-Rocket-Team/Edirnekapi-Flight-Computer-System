@@ -1,7 +1,7 @@
 #include "dataPacking.h"
+#include "main.h"
 
 union DataPack veriler;
-uint8_t bufferPrint[300];
 
 static uint8_t calculateCRC()
 {
@@ -14,13 +14,14 @@ static uint8_t calculateCRC()
 
 static void sendRF()
 {
-	HAL_UART_Transmit(&huart4, veriler.arr, sizeof(veriler.dataYapi), 250);
+	if (HAL_DMA_GetState(&hdma_uart4_tx) != HAL_DMA_STATE_BUSY)
+	{
+		HAL_UART_Transmit_DMA(&huart4, veriler.arr, sizeof(veriler.dataYapi));
+	}
 }
 
-void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power *guc)
+void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power *guc, uint8_t rocketStat)
 {
-	uint8_t durum = 1; //********************************
-
 	veriler.dataYapi.basla = 0xFF;
 
 	uint8_t min = 0;
@@ -30,12 +31,12 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	gpsTime /= 100;
 	min = gpsTime % 100;
 	min = (min << 2) | (sec >> 4);
-	sec = (sec << 4) | (durum);
+	sec = (sec << 4) | (rocketStat);
 	veriler.dataYapi.zaman = min;
 	veriler.dataYapi.durum = sec;
 
 	veriler.dataYapi.voltaj = (uint16_t)(guc->voltaj * 100);
-	veriler.dataYapi.akim = (uint16_t)(int)(guc->akim);
+	veriler.dataYapi.akim = (uint16_t)(int)(guc->mWatt_s);
 
 	veriler.dataYapi.sicaklik = (uint8_t)(int)(bme->temperature * 5);
 	veriler.dataYapi.nem = (uint8_t)(int)(bme->humidity);
@@ -66,12 +67,15 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	veriler.dataYapi.CR	= '\r';
 	veriler.dataYapi.CR	= '\n';
 
-	//sendRF();
+#ifdef ACTIVATE_RF
+	sendRF();
+#endif
 }
 
 void printDatas()
 {
-	  sprintf((char*)bufferPrint, "\r\n\n\n\r%X min: %d  sec: %d  stat: %d  volt: %.2f  crrnt: %d  temp: %.1f\r\n"
+	static uint8_t bufferPrint[300];
+	  sprintf((char*)bufferPrint, "\r\n\n\n\r%X min: %d  sec: %d  stat: %d  volt: %.2f  mWatt/s: %d  temp: %.1f\r\n"
 			  "hum: %d  alt: %.1f  altGps: %.1f  lat: %f  lon: %f\r\n"
 			  "angle: %.1f  pitch:%d  roll:%d  yaw:%d | real pitch: %.1f  roll: %.1f  yaw: %.1f\r\n"
 			  "sat:%d  velocity:%.1f  ivmeX:%.3f  ivmeY:%.3f  ivmeZ:%.3f   CRC: %d", veriler.dataYapi.basla,

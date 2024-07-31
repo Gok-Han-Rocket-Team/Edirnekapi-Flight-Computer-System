@@ -40,6 +40,8 @@ typedef struct Power
 {
 	float voltaj;
 	float akim;
+	float mWatt;
+	float mWatt_s;
 }power;
 /* USER CODE END ET */
 
@@ -80,7 +82,7 @@ void Error_Handler(void);
 #define INT_GYRO_GPIO_Port GPIOB
 #define INT_GYRO_EXTI_IRQn EXTI4_IRQn
 /* USER CODE BEGIN Private defines */
-
+#define ACTIVATE_RF
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

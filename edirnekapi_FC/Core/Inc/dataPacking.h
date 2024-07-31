@@ -13,9 +13,11 @@
 #include "usr_gnss_l86_parser.h"
 #include "bme280.h"
 #include "bmi088.h"
+#include "algorithms.h"
 
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart4;
+extern DMA_HandleTypeDef hdma_uart4_tx;
 extern float euler[3];
 
 struct DataStruct
@@ -49,7 +51,7 @@ struct DataStruct
 	uint8_t yaw;			//yaw verisinin 7-0 bitleri
 	uint16_t hiz;			//hiz değeri 10 ile çarpılıp m/s cinsinden göderilir. Alındığında 10'a bölünüp float yapılmalı.
 	uint16_t DUMMY;			//16 bit boşta *************************
-	uint8_t uyduSayisi;		//ilk 5 bit uydu sayısını vermektedir.
+	uint8_t uyduSayisi;		//Son 5 bit uydu sayısını vermektedir.
 	/*
 	 * 2. bit pithc verisinin 9. biti
 	 * 1. bit roll verisinin 9. biti
@@ -77,6 +79,6 @@ typedef union Address {
     uint8_t address8[2];
 } address;
 
-void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power *guc);
+void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power *guc, enum flightStates);
 void printDatas();
 #endif /* INC_DATAPACKING_H_ */
