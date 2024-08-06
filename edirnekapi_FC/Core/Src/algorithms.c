@@ -35,21 +35,10 @@ uint8_t is_secondP_OK = 0;
 
 uint8_t buffer_alg[100];
 
-
-
-static void buzz()
-{
-	HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-	HAL_Delay(100);
-	HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-	HAL_Delay(100);
-}
-
 static double sqr(double nmbr)
 {
 	return pow(nmbr, 2);
 }
-
 
 /*
  * it works only with BME280 pressure sensor. Measures the vertical velocity.
@@ -114,7 +103,6 @@ void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat)
   }
 }
 
-
 void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 {
 	//Rising detection
@@ -131,12 +119,13 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 
 	//Burnout detection
 	static int burnout_counter = 0;
-	if(BMI->acc_y > BURNOUT_THRESHOLD && isRising_2 == 1 && BMI->rawDatas.isAccelUpdated == 1 && rocketStatus < STAT_MOTOR_BURNOUT)
+	if(BMI->acc_y > BURNOUT_THRESHOLD && isRising_2 == 1 && rocketStatus < STAT_MOTOR_BURNOUT)
 	{
 		burnout_counter++;
 	}
-	if(burnout_counter == 10)
+	if(burnout_counter == 100)
 	{
+		burnout_counter++;
 		rocketStatus = rocketStatus < STAT_MOTOR_BURNOUT ? STAT_MOTOR_BURNOUT : rocketStatus;
 		buzz();
 	}
@@ -150,14 +139,14 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	}
 
 	//Second Parachute
-	if(BME->altitude < SECOND_DEPLOY_ALTITUDE && isFalling_2 == 1 && is_secondP_OK == 1 && rocketStatus < STAT_P1_OK_P2_OK)
+	if(BME->altitude < SECOND_DEPLOY_ALTITUDE && isFalling_2 == 1 && is_secondP_OK == 0 && secondP_counter < 501 && rocketStatus < STAT_P1_OK_P2_OK)
 	{
 		secondP_counter++;
 	}
 	else{
 		secondP_counter = 0;
 	}
-	if(secondP_counter > 20)
+	if(secondP_counter == 500)
 	{
 		rocketStatus = rocketStatus < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : rocketStatus;
 		is_secondP_OK = 1;
@@ -172,15 +161,9 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	else{
 		TD_counter = 0;
 	}
-	if(TD_counter > 100)
+	if(TD_counter > 1000)
 	{
 		rocketStatus = rocketStatus < STAT_TOUCH_DOWN ? STAT_TOUCH_DOWN : rocketStatus;
-		while(1)
-		{
 			buzz();
-		}
-
 	}
 }
-
-

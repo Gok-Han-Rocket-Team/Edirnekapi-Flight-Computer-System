@@ -59,7 +59,8 @@ typedef struct Power
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void buzz();
+void buzzUpdate();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

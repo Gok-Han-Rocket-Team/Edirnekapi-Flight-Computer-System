@@ -47,7 +47,7 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	veriler.dataYapi.voltaj = (uint16_t)(int)(guc->voltaj * 100);
 	veriler.dataYapi.akim = (uint16_t)(int)(guc->mWatt_s);
 
-	veriler.dataYapi.sicaklik = (uint8_t)(int)(bme->temperature * 3);
+	veriler.dataYapi.sicaklik = (int8_t)(int)(bme->temperature * 2);
 	veriler.dataYapi.nem = (uint8_t)(int)(bme->humidity);
 
 	veriler.dataYapi.yukseklik_p = bme->altitude;

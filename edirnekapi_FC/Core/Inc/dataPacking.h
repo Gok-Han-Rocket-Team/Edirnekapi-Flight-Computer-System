@@ -33,7 +33,7 @@ struct DataStruct
  * 	(0101 -> P1-1 P2-1		0110 -> P1-0 P2-1
  * 	(0111 -> ucus bitti		1000 ->
 */
-	uint8_t sicaklik;		//floata çevrilip 5'e bölünmeli, 0.2 derece hassasiyetinde veri gelmekte
+	int8_t sicaklik;		//floata çevrilip 5'e bölünmeli, 0.2 derece hassasiyetinde veri gelmekte
 	uint16_t voltaj;		//floata çevrilip 100'bölünmeli. 100mV hassasiyette veri gelmekte.
 	uint16_t akim;
 	float 	yukseklik_p;

@@ -19,8 +19,8 @@ enum flightStates{
 	STAT_MOTOR_BURNOUT	=	(uint8_t)0x03,
 	STAT_P1_OK_P2_NO	=	(uint8_t)0x04,
 	STAT_P1_OK_P2_OK	=	(uint8_t)0x05,
-	STAT_P1_NO_P2_OK	=	(uint8_t)0x06,
-	STAT_TOUCH_DOWN		=	(uint8_t)0x07,
+	STAT_TOUCH_DOWN		=	(uint8_t)0x06,
+	STAT_P1_NO_P2_OK	=	(uint8_t)0x07,
 };
 
 
@@ -28,7 +28,7 @@ enum flightStates{
 #define RISING_VELOCITY_TRESHOLD	(float)30.0			//ms/sn
 #define FALLING_VELOCITY_TRESHOLD	(float)1.0			//m/sn
 
-#define SECOND_DEPLOY_ALTITUDE 		(float)2.0		//meters				500.0
+#define SECOND_DEPLOY_ALTITUDE 		(float)0.0		//meters				500.0
 #define FIRST_DEPLOY_ARM_ALT 		(float)500.0		//meters
 
 #define RISING_G_TRESHOLD 			(float)3000.0		//mG

@@ -87,6 +87,7 @@ extern int errorLine;
 int counter = 0;
 int counterAcc = 0;
 int counterGy = 0;
+uint32_t buzzLastTime = 0;
 
 uint8_t buf[250];
 uint8_t rocketStatus = 255;
@@ -120,12 +121,6 @@ void getWatt(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static double sqr(double nmbr)
-{
-	return pow(nmbr, 2);
-}
-
-
 /* USER CODE END 0 */
 
 /**
@@ -196,7 +191,13 @@ int main(void)
   UsrGpsL86Init(&huart2);
   HAL_Delay(200);
   rocketStatus = STAT_ROCKET_READY;
-
+  for(int i = 0; i < 5 ; i++)
+  {
+	  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
+	  HAL_Delay(200);
+  }
+  HAL_Delay(900);
+  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
 
   /* USER CODE END 2 */
 
@@ -208,6 +209,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  buzzUpdate();
 	  bmi088_update();
 	  bme280_update();
 	  measurePower(&guc);
@@ -755,6 +757,24 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     	counterAcc++;
     }
 }
+
+void buzz()
+{
+	buzzLastTime = HAL_GetTick();
+}
+
+void buzzUpdate()
+{
+	if(HAL_GetTick() - buzzLastTime < 100)
+	{
+		HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+	}
+	else
+	{
+		HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
+	}
+}
+
 /* USER CODE END 4 */
 
 /**
