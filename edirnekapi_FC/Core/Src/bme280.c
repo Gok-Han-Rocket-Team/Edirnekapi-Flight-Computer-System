@@ -25,7 +25,7 @@ int currentIndex = 0;
 static void bme280_getVals()
 {
 	uint8_t params[8];
-	HAL_StatusTypeDef retVal = HAL_I2C_Mem_Read(I2C_, BME280_ADD, BME280_STATUS, I2C_MEMADD_SIZE_8BIT, params, 1, 20);
+	HAL_StatusTypeDef retVal = HAL_I2C_Mem_Read(I2C_, BME280_ADD, BME280_STATUS, I2C_MEMADD_SIZE_8BIT, params, 1, 100);
 	BME->isUpdated = 0;
 	if((params[0] & (0x01 << 3)) == (0x01 << 3))
 	{
@@ -43,6 +43,10 @@ static void bme280_get_altitude()
 	float p_seaLevel = 1013.25;		//hPa
 	float alt = 44330.0 * (1.0 - pow((BME->pressure / p_seaLevel), (1.0 / 5.255)));
 	BME->altitude = alt - BME->baseAltitude;
+	if(BME->altitude > BME->maxAltitude)
+	{
+		BME->maxAltitude = BME->altitude;
+	}
 }
 
 HAL_StatusTypeDef bme280_init(BME_280_t* BME_sensor,  I2C_HandleTypeDef* I2C_bme, uint8_t mode, uint8_t OS, uint8_t filter){
@@ -57,6 +61,10 @@ HAL_StatusTypeDef bme280_init(BME_280_t* BME_sensor,  I2C_HandleTypeDef* I2C_bme
 	uint8_t resetData = BME280_SOFT_RESET;
 	retVal = HAL_I2C_Mem_Write(I2C_bme, BME280_ADD, BME280_RESET, I2C_MEMADD_SIZE_8BIT, &resetData, 1, 50);		//Soft Reset.
 	HAL_Delay(50);
+	HAL_I2C_DeInit(I2C_bme);
+	HAL_Delay(5);
+	HAL_I2C_Init(I2C_bme);
+	HAL_Delay(5);
 
 	retVal = HAL_I2C_Mem_Read(I2C_bme, BME280_ADD, BME280_PARAM1_START, I2C_MEMADD_SIZE_8BIT, params, 25, 200);
 	BME->parameters.dig_T1 = params[0] | (uint16_t)(params[1] << 8);
@@ -94,15 +102,13 @@ HAL_StatusTypeDef bme280_init(BME_280_t* BME_sensor,  I2C_HandleTypeDef* I2C_bme
 
 	float base = 0.0;
 	HAL_Delay(200);
-	for(int i = 0; i < 10; i++)		//base aliniyor
+	for(int i = 0; i < 50; i++)		//Taking base altitude
 	{
 	  bme280_update();
 	  base +=  BME->altitude;
-	 // sprintf((char*)buf, "alt: %0.f\r\n", base);
-	 // HAL_UART_Transmit(&huart1, buf, strlen((char*)buf), 50);
 	  HAL_Delay(10);
 	}
-	BME->baseAltitude = (base / 10.0);
+	BME->baseAltitude = (base / 50.0);
 	return retVal;
 }
 

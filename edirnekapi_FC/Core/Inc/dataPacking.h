@@ -18,6 +18,8 @@
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart4;
 extern DMA_HandleTypeDef hdma_uart4_tx;
+extern DMA_HandleTypeDef hdma_usart1_tx;
+
 extern float euler[3];
 
 struct DataStruct
@@ -26,10 +28,10 @@ struct DataStruct
 	uint8_t zaman; 			//ilk 6 bit dakika sonraki 2 bit, saniyenin 5. ve 4. bitleri oluyor
 	uint8_t durum;			//ilk 4 bit saniyenin 3. 4. 1. 0. bitleri. son 4 bit ise durum.
 /*
- * 	(0000 -> roket hazır   	0001 -> ucus basladi
- * 	(0010 -> motor bitti	0011 -> P1-1 P2-0
- * 	(0100 -> P1-1 P2-1		0101 -> P1-0 P2-1
- * 	(0110 -> ucus bitti		0111 ->
+ * 	(0001 -> roket hazır   	0010 -> ucus basladi
+ * 	(0011 -> motor bitti	0100 -> P1-1 P2-0
+ * 	(0101 -> P1-1 P2-1		0110 -> P1-0 P2-1
+ * 	(0111 -> ucus bitti		1000 ->
 */
 	uint8_t sicaklik;		//floata çevrilip 5'e bölünmeli, 0.2 derece hassasiyetinde veri gelmekte
 	uint16_t voltaj;		//floata çevrilip 100'bölünmeli. 100mV hassasiyette veri gelmekte.
@@ -50,7 +52,7 @@ struct DataStruct
 	uint8_t roll;			//roll verisinin 7-0 bitleri
 	uint8_t yaw;			//yaw verisinin 7-0 bitleri
 	uint16_t hiz;			//hiz değeri 10 ile çarpılıp m/s cinsinden göderilir. Alındığında 10'a bölünüp float yapılmalı.
-	uint16_t DUMMY;			//16 bit boşta *************************
+	uint16_t maxAltitude;	//Max altitude that rocket launched;
 	uint8_t uyduSayisi;		//Son 5 bit uydu sayısını vermektedir.
 	/*
 	 * 2. bit pithc verisinin 9. biti

@@ -15,10 +15,13 @@ static I2C_HandleTypeDef* bmi_I2C;
 static bmi088_struct_t* BMI;
 static uint8_t isTimeUpdated = 0;
 uint8_t isStarded = 0;
+uint8_t is_offset_taken = 0;
+uint8_t is_gyro_offset = 0;
 
 int errorLine = 0;
-int offsetCounter = 0;
-double g[2][3];		//Offset Values.
+
+double g[2][3] = {0};		//offset array for calculating offset.
+double offset_vals_d[3] = {0};	//Offset values for sensor;
 
 
 extern UART_HandleTypeDef huart1;
@@ -84,7 +87,7 @@ static void bmi088_selfTest()
 
 void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 {
-	quaternionSet_zero();
+	//quaternionSet_zero();
 	HAL_StatusTypeDef retVal = HAL_OK;
 	bmi_I2C = I2C_;
 	BMI = BMI_;
@@ -105,29 +108,31 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 	HAL_Delay(10);
 
 	buf[0] = 0x01;
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_PWR_CONF, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // power save ultra
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_PWR_CONF, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); // power save ultra
 
 	buf[0] = ACC_DISABLE;
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_PWR_CTRL, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // accel disable
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_PWR_CTRL, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); // accel disable
 	HAL_Delay(20);
 
 	buf[0] = ACC_RESET;
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // Accel reset
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); // Accel reset
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 	HAL_Delay(40);
 
 	buf[0] = FIFO_RESET;
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); // FIFO reset
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); // FIFO reset
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 	HAL_Delay(40);
 
 	buf[0] = GYRO_RESET;
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_SOFT_RESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //Gyro reset
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_SOFT_RESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); //Gyro reset
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 	HAL_Delay(40);
 
 	HAL_I2C_DeInit(bmi_I2C);  // I2C arayüzünü de-initialize edin
+	HAL_Delay(5);
 	HAL_I2C_Init(bmi_I2C);    // I2C arayüzünü yeniden initialize edin
+	HAL_Delay(5);
 /*
 	//accel interrupt renew
 	buf[0] = (0x00);
@@ -142,7 +147,7 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 
 	//Gyroscope configuration.
 	buf[0] = BMI->deviceConfig.gyro_range;
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_RANGE, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //Gyro range config
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_RANGE, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); //Gyro range config
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 
 
@@ -258,22 +263,24 @@ void bmi088_update()
 			BMI->delta_angle_y = (((float)gyro_y_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_Y_OFFSET) * BMI->deltaTime;
 			BMI->delta_angle_x = (((float)gyro_x_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_X_OFFSET) * BMI->deltaTime;
 			 */
-			BMI->gyro_z = (((double)gyro_z_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_Z_OFFSET);
-			BMI->gyro_y = (((double)gyro_y_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_Y_OFFSET);
-			BMI->gyro_x = (((double)gyro_x_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_X_OFFSET);
+			BMI->gyro_z = (((double)gyro_z_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - offset_vals_d[0]);
+			BMI->gyro_y = (((double)gyro_y_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - offset_vals_d[1]);
+			BMI->gyro_x = (((double)gyro_x_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - offset_vals_d[2]);
 
 			BMI->gyro_z_angle += (BMI->gyro_z) * BMI->deltaTime;
 			BMI->gyro_y_angle += (BMI->gyro_y) * BMI->deltaTime;
 			BMI->gyro_x_angle += (BMI->gyro_x) * BMI->deltaTime;
 
+
 			//update_quaternion(q, BMI->gyro_x, BMI->gyro_y, BMI->gyro_z, BMI->deltaTime);
 			//calculateQuaternion(q, BMI->gyro_x, BMI->gyro_y, BMI->gyro_z, BMI->deltaTime, vector);
 
-			updateQuaternion(BMI->gyro_x * M_PI / 180.0, BMI->gyro_y * M_PI / 180.0, BMI->gyro_z * M_PI / 180.0, BMI->deltaTime);
+			updateQuaternion(-BMI->gyro_z * M_PI / 180.0, BMI->gyro_x * M_PI / 180.0, -BMI->gyro_y * M_PI / 180.0, BMI->deltaTime);
 			quaternionToEuler();
 
 			BMI->rawDatas.isGyroUpdated = 0;
 			isTimeUpdated = 0;
+			is_gyro_offset = 1;
 		}else
 		{
 			BMI->lastTime = BMI->currentTime;
@@ -302,27 +309,37 @@ uint8_t bmi088_getGyroChipId()
 
 void getOffset()
 {
-
 	uint8_t buffer[250];
-	 if(offsetCounter < 1000){
-		 g[0][0] += BMI->gyro_x;
-		 g[0][1] += BMI->gyro_y;
-		 g[0][2] += BMI->gyro_z;
-		 g[1][0] += BMI->acc_x;
-		 g[1][1] += BMI->acc_y;
-		 g[1][2] += BMI->acc_z;
-		 offsetCounter++;
-	 }else{
-		 g[0][0] /= 999.0;
-		 g[0][1] /= 999.0;
-		 g[0][2] /= 999.0;
-		 g[1][0] /= 1000.0;
-		 g[1][1] /= 1000.0;
-		 g[1][2] /= 1000.0;
-		 sprintf((char*)buffer, "\n\n\rg_x:%f \t g_y:%f \t g_z:%f \t a_x:%f \t a_y:%f \ta_z:%f\n\n\r", g[0][0], g[0][1], g[0][2], g[1][0], g[1][1], g[1][2]);
-		 HAL_UART_Transmit(&huart1, buffer, strlen((char*) buffer), 250);
-		 Error_Handler();
-	 }
+	static int offsetCounter = 0;
+
+	while(1)
+	{
+		bmi088_update();
+		if(is_gyro_offset == 1)
+		{
+			if(offsetCounter < 1000){
+					 g[0][0] += BMI->gyro_x;
+					 g[0][1] += BMI->gyro_y;
+					 g[0][2] += BMI->gyro_z;
+					 offsetCounter++;
+				 }
+			else{
+					 g[0][0] /= 1000.0;
+					 g[0][1] /= 1000.0;
+					 g[0][2] /= 1000.0;
+					 offset_vals_d[0] = g[0][0];
+					 offset_vals_d[1] = g[0][1];
+					 offset_vals_d[2] = g[0][2];
+					 sprintf((char*)buffer, "\n\n\rg_x:%f \t g_y:%f \t g_z:%f\n\n\r", g[0][0], g[0][1], g[0][2]);
+					 HAL_UART_Transmit(&huart1, buffer, strlen((char*) buffer), 250);
+					 quaternionSet_zero();
+					 break;
+					 //Error_Handler();
+				 }
+			is_gyro_offset = 0;
+		}
+
+	}
 }
 
 

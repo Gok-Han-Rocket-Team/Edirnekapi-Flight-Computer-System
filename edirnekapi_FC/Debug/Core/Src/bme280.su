@@ -1,5 +1,5 @@
 ../Core/Src/bme280.c:25:13:bme280_getVals	40	static
 ../Core/Src/bme280.c:41:13:bme280_get_altitude	16	static
-../Core/Src/bme280.c:48:19:bme280_init	80	static
-../Core/Src/bme280.c:110:6:bme280_update	360	static
-../Core/Src/bme280.c:165:7:moving_average	24	static
+../Core/Src/bme280.c:52:19:bme280_init	80	static
+../Core/Src/bme280.c:116:6:bme280_update	360	static
+../Core/Src/bme280.c:171:7:moving_average	24	static

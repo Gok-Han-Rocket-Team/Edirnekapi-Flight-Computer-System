@@ -80,6 +80,7 @@ typedef struct BME280_struct
 	float pressure;
 	float humidity;
 	float height;
+	volatile float maxAltitude;
 	volatile float altitude;
 	volatile float baseAltitude;
 	float velocity;

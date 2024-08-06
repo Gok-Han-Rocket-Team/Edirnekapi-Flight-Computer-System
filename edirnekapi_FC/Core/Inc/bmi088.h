@@ -17,6 +17,19 @@ extern float roll, pitch, yaw;
 #define CARD_1
 //#define CARD_2
 
+//Offset Values
+#ifdef CARD_1
+#define ACCEL_Z_OFFSET 			(double)4.0
+#define ACCEL_Y_OFFSET 			(double)-15.0
+#define ACCEL_X_OFFSET 			(double)-4.0
+#endif
+
+#ifdef CARD_2
+#define ACCEL_Z_OFFSET 			(double)0.0
+#define ACCEL_Y_OFFSET 			(double)0.0
+#define ACCEL_X_OFFSET 			(double)0.0
+#endif
+
 //Accelerometer register address
 #define ACC_I2C_ADD				((uint8_t)0x18 << 1)
 
@@ -156,23 +169,7 @@ extern float roll, pitch, yaw;
 #define GYRO_INT_MAP_BOTH		0x81
 
 
-#ifdef CARD_1
-#define ACCEL_Z_OFFSET 			(double)0.0
-#define ACCEL_Y_OFFSET 			(double)0.0
-#define ACCEL_X_OFFSET 			(double)0.0
-#define GYRO_X_OFFSET			(double)0.0
-#define GYRO_Y_OFFSET			(double)-0.20
-#define GYRO_Z_OFFSET			(double)0.016
-#endif
 
-#ifdef CARD_2
-#define ACCEL_Z_OFFSET 			(double)0.0
-#define ACCEL_Y_OFFSET 			(double)0.0
-#define ACCEL_X_OFFSET 			(double)0.0
-#define GYRO_X_OFFSET			(double)0.0
-#define GYRO_Y_OFFSET			(double)-0.20
-#define GYRO_Z_OFFSET			(double)0.016
-#endif
 //Functions
 
 

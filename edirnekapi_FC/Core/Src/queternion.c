@@ -37,10 +37,61 @@ void quaternionToEuler(void) {
   euler[2] = atan2(2.0f * (q[0] * q[3] + q[1] * q[2]), 1.0f - 2.0f * (q[2] * q[2] + q[3] * q[3])) * (180.0 / M_PI);
 }
 
+
+float quaternionToTheta(){
+
+	float theta = 0.0;
+
+	float r13 = 2 * q[1] * q[3] + 2 * q[2] * q[0];
+	float r23 = 2 * q[2] * q[3] - 2 * q[1] * q[0];
+	float r33 = 1 - 2 * q[1] * q[1] - 2 * q[2] * q[2];
+
+	float z_x = r13;
+	float z_y = r23;
+	float z_z = r33;
+
+	float dotProduct = z_z;
+	float magnitude = sqrt(z_x * z_x + z_y * z_y + z_z * z_z);
+
+	theta = acos(dotProduct / magnitude) * 180.0 / 3.14;
+	return theta;
+}
+
+
+
+// İvmeölçerden başlangıç quaternioni hesaplama
+static void getInitialQuaternion() {
+
+    double norm = sqrt(BMI_sensor.acc_z * BMI_sensor.acc_z + BMI_sensor.acc_x * BMI_sensor.acc_x + BMI_sensor.acc_y * BMI_sensor.acc_y);
+    double accel_temp[3];
+
+    accel_temp[0] = (double)BMI_sensor.acc_x;
+    accel_temp[1] = (double)BMI_sensor.acc_y;
+    accel_temp[2] = (double)BMI_sensor.acc_z;
+
+    accel_temp[0] /= norm;
+    accel_temp[1] /= norm;
+    accel_temp[2] /= norm;
+
+    double q_temp[4];
+
+    q_temp[0] = sqrt(1.0 -accel_temp[1]) * 0.5;
+    double k = 0.5 / q_temp[0];
+    q_temp[1] = accel_temp[0] * k * 0.5;
+    q_temp[2] = accel_temp[2] * k * 0.5;
+    q_temp[3] = 0.0;
+
+    norm = sqrt(q_temp[0] * q_temp[0] + q_temp[1] * q_temp[1] + q_temp[2] * q_temp[2] + q_temp[3] * q_temp[3]);
+
+    q[0] = q_temp[0] / norm;
+    q[1] = q_temp[1] / norm;
+    q[2] = q_temp[2] / norm;
+    q[3] = 0.0f;
+}
+
+
+
 void quaternionSet_zero(void)
 {
-	q[0] = 1.0f;
-	q[1] = 0.0f;
-	q[2] = 0.0f;
-	q[3] = 0.0f;
+	getInitialQuaternion();
 }

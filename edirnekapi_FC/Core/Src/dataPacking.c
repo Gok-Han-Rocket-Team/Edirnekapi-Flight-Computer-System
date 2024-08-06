@@ -1,5 +1,6 @@
 #include "dataPacking.h"
 #include "main.h"
+#include "queternion.h"
 
 union DataPack veriler;
 
@@ -20,6 +21,14 @@ static void sendRF()
 	}
 }
 
+static void sendPC()
+{
+	if (HAL_DMA_GetState(&hdma_usart1_tx) != HAL_DMA_STATE_BUSY)
+	{
+		HAL_UART_Transmit_DMA(&huart1, veriler.arr , sizeof(veriler.dataYapi));
+	}
+}
+
 void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power *guc, uint8_t rocketStat)
 {
 	veriler.dataYapi.basla = 0xFF;
@@ -35,13 +44,14 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	veriler.dataYapi.zaman = min;
 	veriler.dataYapi.durum = sec;
 
-	veriler.dataYapi.voltaj = (uint16_t)(guc->voltaj * 100);
+	veriler.dataYapi.voltaj = (uint16_t)(int)(guc->voltaj * 100);
 	veriler.dataYapi.akim = (uint16_t)(int)(guc->mWatt_s);
 
-	veriler.dataYapi.sicaklik = (uint8_t)(int)(bme->temperature * 5);
+	veriler.dataYapi.sicaklik = (uint8_t)(int)(bme->temperature * 3);
 	veriler.dataYapi.nem = (uint8_t)(int)(bme->humidity);
 
 	veriler.dataYapi.yukseklik_p = bme->altitude;
+	veriler.dataYapi.maxAltitude = (int16_t)(int)bme->maxAltitude;
 	veriler.dataYapi.yukseklik_gps = gps->altitudeInMeter;
 
 	veriler.dataYapi.lat = gps->lat;
@@ -58,18 +68,21 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	veriler.dataYapi.uyduSayisi = ((uint8_t)gps->satInUse << 3) | (((int)euler[0] & 0x8000) >> 13) | (((int)euler[1] & 0x8000) >> 14) | (((int)euler[2] & 0x8000) >> 15);
 	veriler.dataYapi.hiz = (uint16_t)(int)(bme->velocity * 10);
 
-	veriler.dataYapi.aci = 50;
+	veriler.dataYapi.aci = quaternionToTheta();
 	veriler.dataYapi.pitch = (uint8_t)((int)abs(euler[0]));
 	veriler.dataYapi.roll = (uint8_t)((int)abs(euler[1]));
 	veriler.dataYapi.yaw = (uint8_t)((int)abs(euler[2]));
 
 	veriler.dataYapi.checkSum = calculateCRC();
 	veriler.dataYapi.CR	= '\r';
-	veriler.dataYapi.CR	= '\n';
+	veriler.dataYapi.LF	= '\n';
 
 #ifdef ACTIVATE_RF
-	sendRF();
+	if(guc->voltaj > 8.0){
+		sendRF();
+	}
 #endif
+	sendPC();
 }
 
 void printDatas()
@@ -81,7 +94,7 @@ void printDatas()
 			  "sat:%d  velocity:%.1f  ivmeX:%.3f  ivmeY:%.3f  ivmeZ:%.3f   CRC: %d", veriler.dataYapi.basla,
 			  (veriler.dataYapi.zaman >> 2), ((veriler.dataYapi.zaman & 3) << 4) | (veriler.dataYapi.durum >> 4),
 			  veriler.dataYapi.durum & 0x0F, ((float)veriler.dataYapi.voltaj) / 100 ,
-			  veriler.dataYapi.akim , (float)veriler.dataYapi.sicaklik / 5, veriler.dataYapi.nem,
+			  veriler.dataYapi.akim , (float)veriler.dataYapi.sicaklik / 3, veriler.dataYapi.nem,
 			  veriler.dataYapi.yukseklik_p, veriler.dataYapi.yukseklik_gps, veriler.dataYapi.lat,
 			  veriler.dataYapi.lon, veriler.dataYapi.aci, (veriler.dataYapi.pitch * ((veriler.dataYapi.uyduSayisi & 0x04)?-1:1)),
 			  (veriler.dataYapi.roll * (((veriler.dataYapi.uyduSayisi & 0x02)?-1:1))),

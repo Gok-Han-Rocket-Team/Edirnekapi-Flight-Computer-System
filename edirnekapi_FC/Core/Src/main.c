@@ -64,7 +64,7 @@ DMA_HandleTypeDef hdma_usart2_rx;
 /* USER CODE BEGIN PV */
 
 static BME_280_t BME280_sensor;
-static bmi088_struct_t BMI_sensor;
+bmi088_struct_t BMI_sensor;
 static lorastruct e22_lora;
 static S_GPS_L86_DATA gnss_data;
 static power guc;
@@ -72,7 +72,7 @@ static power guc;
 // Kp for proportional feedback, Ki for integral
 
 extern float euler[3];
-
+extern uint8_t is_offset_taken;
 extern _f g_GnssRx_Flag;
 float currentTime = 0;
 float lastTime =0;
@@ -80,7 +80,7 @@ float lastTime2 =0;
 float powerLastTime = 0;
 float loraLastTime = 0;
 float lora_hz = 1.0;
-
+float wattLastTime = 0;
 
 extern int errorLine;
 
@@ -120,6 +120,10 @@ void getWatt(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static double sqr(double nmbr)
+{
+	return pow(nmbr, 2);
+}
 
 
 /* USER CODE END 0 */
@@ -186,6 +190,9 @@ int main(void)
 
   //Bu makro gps verisini gözlemlemek içindir.
   //VIEW_GPS()
+
+  getOffset();
+
   UsrGpsL86Init(&huart2);
   HAL_Delay(200);
   rocketStatus = STAT_ROCKET_READY;
@@ -201,18 +208,17 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-	  bme280_update();
 	  bmi088_update();
+	  bme280_update();
 	  measurePower(&guc);
 
 #if defined(ALGORITHM_1)
 	  algorithm_1_update(&BME280_sensor, algorithm_1_stat);
 #endif
 #if defined(ALGORITHM_2)
-	  algorithm_2_update(&BME280_sensor, &BMI_sensor, euler[1]);
+	  float teta = quaternionToTheta();
+	  algorithm_2_update(&BME280_sensor, &BMI_sensor, teta);
 #endif
-
 
 /*
 	 if (__HAL_UART_GET_FLAG(&huart4, UART_FLAG_RXNE) == SET) {
@@ -233,9 +239,10 @@ int main(void)
 			 //sprintf((char*)buf, "temp = %.2fC  time %.0fuS A_x: %.1fmG  A_y: %.1fm  A_z: %.1fmG   G_z: %fdps\r\n", BMI_sensor.temp, BMI_sensor.currentTime, BMI_sensor.acc_x, BMI_sensor.acc_y, BMI_sensor.acc_z, BMI_sensor.gyro_z);
 			 //sprintf((char*)buf, "G_x: %f  G_y: %f  G_z: %f   \r\n", BMI_sensor.gyro_x_angle, BMI_sensor.gyro_y_angle, BMI_sensor.gyro_z_angle);
 			 //sprintf((char*)buf, "counter = %d  A_x: %.0f   A_y: %.0f   A_z: %.0f\r\n", counter, BMI_sensor.acc_x, BMI_sensor.acc_y, BMI_sensor.acc_z);
-			 //sprintf((char*)buf, "counter = %d  g_x: %f   g_y: %f   g_z: %f\r\n", counter, BMI_sensor.gyro_x, BMI_sensor.gyro_y, BMI_sensor.gyro_z);
+			 //sprintf((char*)buf, "g_x: %f   g_y: %f   g_z: %f\r\n", BMI_sensor.gyro_x, BMI_sensor.gyro_y, BMI_sensor.gyro_z);
 			 //sprintf((char*)buf, "gyro chip id = %d\r\n", bmi088_getGyroChipId());
-			 //sprintf((char*)buf, "g_x:%f \t g_y:%f \t g_z:%f \t a_x:%f \t a_y:%f \t a_z:%f\r\n", BMI_sensor.gyro_x, BMI_sensor.gyro_y, BMI_sensor.gyro_z, BMI_sensor.acc_x, BMI_sensor.acc_y, BMI_sensor.acc_z);			 //sprintf((char*)buf, "Olusan Yeni Vektör: (%f, %f, %f)\n\r", rotatedVector.x, rotatedVector.y, rotatedVector.z);
+			 //sprintf((char*)buf, "a_x:%f \t a_y:%f \t a_z:%f\r\n", BMI_sensor.acc_x, BMI_sensor.acc_y, BMI_sensor.acc_z);
+			 //sprintf((char*)buf, "Olusan Yeni Vektör: (%f, %f, %f)\n\r", rotatedVector.x, rotatedVector.y, rotatedVector.z);
 			 //sprintf((char*)buf, "roll:%f   pitch:%f   yaw:%f\n\r", roll, pitch, yaw);
 			 //sprintf((char*)buf, "irtifa: %.1f \t aci: %.0f \r\n", BME280_sensor.altitude, teta);
 			 //sprintf((char*)buf, "irtifa: %.1fm \t sicaklik %.0fC \t nem: %0.f%% \r\n", BME280_sensor.altitude, BME280_sensor.temperature, BME280_sensor.humidity);
@@ -248,16 +255,19 @@ int main(void)
 			 //sprintf((char*)buf, "q[0]: %f  q[1]: %f  q[2]: %f   q[3]: %f\r\n", q[0], q[1], q[2], q[3]);
 			 //sprintf((char*)buf, "v[0]: %f  v[1]: %f  v[2]: %f   teta: %f\r\n", vector[0], vector[1], vector[2], (180.0 / M_PI) * atan2(sqrt(pow(vector[0],2.0) + pow(vector[1],2.0)), vector[2]));
 			 //sprintf((char*)buf, "teta: %f\r\n", (180.0 / M_PI) * atan2(sqrt(pow(BMI_sensor.acc_x,2.0) + pow(BMI_sensor.acc_y,2.0)), BMI_sensor.acc_z));
-			 //sprintf((char*)buf, "A %f %f %f\r\n", yaw,  -roll, pitch);
 
 
+			 //sprintf((char*)buf, "teta = %f", teta);
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
 
 			 lastTime = currentTime;
 
 		 }
 
-		 if(fabs(currentTime - lastTime2) > 1)
+
+
+
+		 if(fabs(currentTime - lastTime2) > 5)
 		 {
 			 //HAL_UART_Transmit(&huart4, (uint8_t*)"merhaba\n\r", 9, 250);
 			 //sprintf((char*)buf, "lat:%f\tlong:%f\ttime:%.0f\tsat:%d\r\n", gnss_data.lat, gnss_data.lon, gnss_data.timeDateBuf, gnss_data.satInUse);
@@ -266,16 +276,15 @@ int main(void)
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
 			 //counterAcc = 0;
 
-
 			 lastTime2 = currentTime;
 		 }
 
+		 //GNSS get location
 		 if(g_GnssRx_Flag)
 		 {
 			 Usr_GpsL86GetValues(&gnss_data);
 			 //printDatas();
 		 }
-
 
 
 		 //Lora timer;
@@ -285,9 +294,10 @@ int main(void)
 		 {
 			 getWatt();
 			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc, rocketStatus);
-			 printDatas();
+			 //printDatas();
 			 loraLastTime = currentTime;
 		 }
+
 
 
 
@@ -308,7 +318,7 @@ void SystemClock_Config(void)
   /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -318,11 +328,18 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
-  RCC_OscInitStruct.PLL.PLLN = 64;
+  RCC_OscInitStruct.PLL.PLLN = 180;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 2;
   RCC_OscInitStruct.PLL.PLLR = 2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Activate the Over-Drive mode
+  */
+  if (HAL_PWREx_EnableOverDrive() != HAL_OK)
   {
     Error_Handler();
   }
@@ -333,10 +350,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
@@ -363,7 +380,7 @@ static void MX_ADC1_Init(void)
   /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
   */
   hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.ScanConvMode = ENABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
@@ -716,7 +733,11 @@ void measurePower(power *guc_)
 
 void getWatt()
 {
-	guc.mWatt_s = guc.mWatt;
+
+	float currentTime = (float)HAL_GetTick() / 1000;
+	float deltaTime = currentTime - wattLastTime;
+	wattLastTime = currentTime;
+	guc.mWatt_s = guc.mWatt / deltaTime;
 	guc.mWatt = 0.0;
 }
 
@@ -747,12 +768,15 @@ void Error_Handler(void)
 
 	sprintf((char*)buf, "error line: %d\r\n", errorLine);
 	HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
+	HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
+	HAL_Delay(100);
+	HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
+	HAL_Delay(100);
 
 	__disable_irq();
   while (1)
   {
-		HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-		HAL_Delay(100);
+
   }
 
   /* USER CODE END Error_Handler_Debug */
