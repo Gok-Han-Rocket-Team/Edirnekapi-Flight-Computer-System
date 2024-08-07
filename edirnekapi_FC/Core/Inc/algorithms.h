@@ -26,18 +26,19 @@ enum flightStates{
 
 
 #define RISING_VELOCITY_TRESHOLD	(float)30.0			//ms/sn
-#define FALLING_VELOCITY_TRESHOLD	(float)1.0			//m/sn
+#define ALGORITHM_1_LOCKOUT_TIME	(uint32_t)13000		//ms
+#define FALLING_VELOCITY_TRESHOLD	(float)3.0			//m/sn
+#define FIRST_DEPLOY_ARM_ALT 		(float)1000.0		//meters  500.0
+#define SECOND_DEPLOY_ALTITUDE 		(float)500.0		//meters				500.0
 
-#define SECOND_DEPLOY_ALTITUDE 		(float)0.0		//meters				500.0
-#define FIRST_DEPLOY_ARM_ALT 		(float)500.0		//meters
 
 #define RISING_G_TRESHOLD 			(float)3000.0		//mG
-#define ARMING_ALTITUDE				(float)-5.0		//m				500.0
-#define BURNOUT_THRESHOLD			(float)0.0		//mG			3000.0
+#define ARMING_ALTITUDE				(float)500.0		//m				500.0
+#define BURNOUT_THRESHOLD			(float)1.0		//mG			3000.0
 #define ANGLE_THRESHOLD				(float)80.0			//degree
 typedef uint8_t algorithmStatus;
 
-void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat);
+void algorithm_1_update(BME_280_t* BME);
 void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle);
 
 #endif /* INC_ALGORITHMS_H_ */

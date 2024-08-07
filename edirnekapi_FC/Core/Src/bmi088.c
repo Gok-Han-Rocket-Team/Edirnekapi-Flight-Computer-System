@@ -31,6 +31,7 @@ extern UART_HandleTypeDef huart1;
 #include <stdio.h>
 #endif
 
+#ifdef SELFTEST_ENABLED
 static void bmi088_selfTest()
 {
 	HAL_Delay(100);
@@ -84,6 +85,7 @@ static void bmi088_selfTest()
 	if(retVal != HAL_OK)
 		Error_Handler();
 }
+#endif
 
 void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 {
@@ -309,7 +311,6 @@ uint8_t bmi088_getGyroChipId()
 
 void getOffset()
 {
-	uint8_t buffer[250];
 	static int offsetCounter = 0;
 
 	while(1)
@@ -330,8 +331,6 @@ void getOffset()
 					 offset_vals_d[0] = g[0][0];
 					 offset_vals_d[1] = g[0][1];
 					 offset_vals_d[2] = g[0][2];
-					 sprintf((char*)buffer, "\n\n\rg_x:%f \t g_y:%f \t g_z:%f\n\n\r", g[0][0], g[0][1], g[0][2]);
-					 HAL_UART_Transmit(&huart1, buffer, strlen((char*) buffer), 250);
 					 quaternionSet_zero();
 					 break;
 					 //Error_Handler();

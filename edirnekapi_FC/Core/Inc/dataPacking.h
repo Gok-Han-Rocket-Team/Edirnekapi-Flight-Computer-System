@@ -51,8 +51,8 @@ struct DataStruct
 	uint8_t pitch;			//pitch verisinin 7-0 bitleri
 	uint8_t roll;			//roll verisinin 7-0 bitleri
 	uint8_t yaw;			//yaw verisinin 7-0 bitleri
-	uint16_t hiz;			//hiz değeri 10 ile çarpılıp m/s cinsinden göderilir. Alındığında 10'a bölünüp float yapılmalı.
-	uint16_t maxAltitude;	//Max altitude that rocket launched;
+	int16_t hiz;			//hiz değeri 10 ile çarpılıp m/s cinsinden göderilir. Alındığında 10'a bölünüp float yapılmalı.
+	int16_t maxAltitude;	//Max altitude that rocket launched;
 	uint8_t uyduSayisi;		//Son 5 bit uydu sayısını vermektedir.
 	/*
 	 * 2. bit pithc verisinin 9. biti

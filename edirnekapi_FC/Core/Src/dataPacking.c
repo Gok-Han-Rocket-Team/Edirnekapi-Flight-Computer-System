@@ -66,7 +66,7 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	veriler.dataYapi.accZ = bmi->acc_z / 1000;
 
 	veriler.dataYapi.uyduSayisi = ((uint8_t)gps->satInUse << 3) | (((int)euler[0] & 0x8000) >> 13) | (((int)euler[1] & 0x8000) >> 14) | (((int)euler[2] & 0x8000) >> 15);
-	veriler.dataYapi.hiz = (uint16_t)(int)(bme->velocity * 10);
+	veriler.dataYapi.hiz = (int16_t)(int)(bme->velocity * 10);
 
 	veriler.dataYapi.aci = quaternionToTheta();
 	veriler.dataYapi.pitch = (uint8_t)((int)abs(euler[0]));
@@ -81,8 +81,10 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	if(guc->voltaj > 8.0){
 		sendRF();
 	}
+	else{
+		sendPC();
+	}
 #endif
-	sendPC();
 }
 
 void printDatas()

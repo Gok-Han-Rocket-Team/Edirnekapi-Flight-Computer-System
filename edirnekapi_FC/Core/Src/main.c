@@ -40,7 +40,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define ALGORITHM_2
+#define ALGORITHM_1
+//#define ALGORITHM_2
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -49,7 +50,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- ADC_HandleTypeDef hadc1;
+ADC_HandleTypeDef hadc1;
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
@@ -91,14 +92,6 @@ uint32_t buzzLastTime = 0;
 
 uint8_t buf[250];
 uint8_t rocketStatus = 255;
-
-
-
-#if defined(ALGORITHM_1)
-static algorithmStatus algorithm_1_stat[2];
-#endif
-
-
 
 /* USER CODE END PV */
 
@@ -181,7 +174,7 @@ int main(void)
   HAL_DMA_Init(&hdma_usart1_tx);
   HAL_DMA_Init(&hdma_usart2_rx);
   HAL_DMA_Init(&hdma_uart4_tx);
-   // Timer'ı başlat
+  // Timer'ı başlat
 
   //Bu makro gps verisini gözlemlemek içindir.
   //VIEW_GPS()
@@ -205,7 +198,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -215,7 +207,7 @@ int main(void)
 	  measurePower(&guc);
 
 #if defined(ALGORITHM_1)
-	  algorithm_1_update(&BME280_sensor, algorithm_1_stat);
+	  algorithm_1_update(&BME280_sensor);
 #endif
 #if defined(ALGORITHM_2)
 	  float teta = quaternionToTheta();
@@ -250,34 +242,23 @@ int main(void)
 			 //sprintf((char*)buf, "irtifa: %.1fm \t sicaklik %.0fC \t nem: %0.f%% \r\n", BME280_sensor.altitude, BME280_sensor.temperature, BME280_sensor.humidity);
 			 //HAL_I2C_Mem_Read(&hi2c3, ACC_I2C_ADD, ACC_CHIP_ID, 1, dat, I2C_MEMADD_SIZE_8BIT, 100);
 			 //sprintf((char*)buf, "chip id: %d\n\r", *dat);
-
 			 //sprintf((char*)buf, "%c", *dat);
 			 //sprintf((char*)buf, "sizeof float: %d   sizeof double: %d\r\n", sizeof(float), sizeof(double));
-
 			 //sprintf((char*)buf, "q[0]: %f  q[1]: %f  q[2]: %f   q[3]: %f\r\n", q[0], q[1], q[2], q[3]);
 			 //sprintf((char*)buf, "v[0]: %f  v[1]: %f  v[2]: %f   teta: %f\r\n", vector[0], vector[1], vector[2], (180.0 / M_PI) * atan2(sqrt(pow(vector[0],2.0) + pow(vector[1],2.0)), vector[2]));
 			 //sprintf((char*)buf, "teta: %f\r\n", (180.0 / M_PI) * atan2(sqrt(pow(BMI_sensor.acc_x,2.0) + pow(BMI_sensor.acc_y,2.0)), BMI_sensor.acc_z));
-
-
 			 //sprintf((char*)buf, "teta = %f", teta);
+			 //sprintf((char*)buf, "speed = %f\n\r", BME280_sensor.velocity);
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
-
 			 lastTime = currentTime;
-
 		 }
-
-
-
-
 		 if(fabs(currentTime - lastTime2) > 5)
 		 {
 			 //HAL_UART_Transmit(&huart4, (uint8_t*)"merhaba\n\r", 9, 250);
 			 //sprintf((char*)buf, "lat:%f\tlong:%f\ttime:%.0f\tsat:%d\r\n", gnss_data.lat, gnss_data.lon, gnss_data.timeDateBuf, gnss_data.satInUse);
-
 			 //sprintf((char*)buf, "acc counter: %d  dt:%f\r\n", counterAcc, BMI_sensor.deltaTime);
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
 			 //counterAcc = 0;
-
 			 lastTime2 = currentTime;
 		 }
 
@@ -287,8 +268,6 @@ int main(void)
 			 Usr_GpsL86GetValues(&gnss_data);
 			 //printDatas();
 		 }
-
-
 		 //Lora timer;
 		 currentTime = ((float)HAL_GetTick()) / 1000.0;
 
@@ -299,10 +278,6 @@ int main(void)
 			 //printDatas();
 			 loraLastTime = currentTime;
 		 }
-
-
-
-
   }
 
   /* USER CODE END 3 */

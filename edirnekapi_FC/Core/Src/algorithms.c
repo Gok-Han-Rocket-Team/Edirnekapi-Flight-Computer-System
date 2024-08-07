@@ -25,6 +25,8 @@ int fallingCounter = 0;
 static int TD_counter = 0;
 static int secondP_counter = 0;
 
+uint32_t algorithm_1_start_time_u32 = 0;
+
 uint8_t isFalling = 0;
 uint8_t isFalling_2 = 0;
 uint8_t isRising = 0;
@@ -32,7 +34,6 @@ uint8_t isRising_2 = 0;
 uint8_t isUpdated_1 = 0;
 uint8_t isUpdated_2 = 0;
 uint8_t is_secondP_OK = 0;
-
 uint8_t buffer_alg[100];
 
 static double sqr(double nmbr)
@@ -45,12 +46,12 @@ static double sqr(double nmbr)
  * it detects the first deploy
  * it detecets the second deploy via altitude
  */
-void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat)
+void algorithm_1_update(BME_280_t* BME)
 {
 
 	//velocity measuiring
 	currentTime_1 = (float)HAL_GetTick() / 1000.0;
-  if(fabs(currentTime_1 - lastTime_1) > 0.05)
+  if(fabs(currentTime_1 - lastTime_1) > 0.1)
   {
 	  float currentAltitude = BME->altitude;
 	  BME->velocity = (currentAltitude - lastAltitude_1) / (currentTime_1 - lastTime_1);
@@ -61,45 +62,60 @@ void algorithm_1_update(BME_280_t* BME, algorithmStatus* stat)
 
   if(isUpdated_1)
   {
+	isUpdated_1 = 0;
 
-	  isUpdated_1 = 0;
+	//rising detection
+	if(BME->velocity > RISING_VELOCITY_TRESHOLD && isRising == 0)
+	{
+	  risingCounter++;
+	}
+	else
+	{
+	  risingCounter = 0;
+	}
 
-	  //rising detection
-	  if(BME->velocity > RISING_VELOCITY_TRESHOLD)
-	  {
-		  risingCounter++;
-	  }
-	  else
-	  {
-		  risingCounter = 0;
-	  }
+	if(risingCounter == 1 && isRising == 0 && isFalling == 0 )
+	{
+	  isRising = 1;
+	  algorithm_1_start_time_u32 = HAL_GetTick();
+	  rocketStatus = rocketStatus < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : rocketStatus;
+	  buzz();
+	}
 
-	  if(risingCounter == 3 && isRising == 0 && isFalling == 0 )
-	  {
-		  isRising = 1;
-	  }
+	//Falling detection || First parachute
+	if(BME->velocity < FALLING_VELOCITY_TRESHOLD && HAL_GetTick() - algorithm_1_start_time_u32 > ALGORITHM_1_LOCKOUT_TIME)
+	{
+	  fallingCounter++;
+	}
+	else
+	{
+	  fallingCounter = 0;
+	}
 
-	  //falling detection
-	  if(BME->velocity < FALLING_VELOCITY_TRESHOLD)
-	  {
-		  fallingCounter++;
-	  }
-	  else
-	  {
-		  fallingCounter = 0;
-	  }
+	if(fallingCounter == 1 && isRising == 1 && isFalling == 0 && BME->altitude > FIRST_DEPLOY_ARM_ALT)
+	{
+	  isFalling = 1;
+	  rocketStatus = rocketStatus < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : rocketStatus;
+	  buzz();
+	}
 
-	  if(fallingCounter == 3 && isRising == 1 && isFalling == 0 && BME->altitude > FIRST_DEPLOY_ARM_ALT)
-	  {
-		  isFalling = 1;
-		  stat[0] = 1;
-	  }
+	//Second Parachute
+	static int second_p_counter_1 = 0;
+	static uint8_t is_second_p_OK_1 = 0;
 
-	  //second parachute
-	  if(isFalling == 1 && BME->altitude < SECOND_DEPLOY_ALTITUDE && stat[1] == 0)
-	  {
-		  stat[1] = 1;
-	  }
+	if(BME->altitude < SECOND_DEPLOY_ALTITUDE && isFalling == 1 && is_second_p_OK_1 == 0)
+	{
+		second_p_counter_1++;
+	}
+	else{
+		second_p_counter_1 = 0;
+	}
+	if(second_p_counter_1 == 10)
+	{
+		rocketStatus = rocketStatus < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : rocketStatus;
+		is_second_p_OK_1 = 1;
+		buzz();
+	}
   }
 }
 
@@ -119,13 +135,12 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 
 	//Burnout detection
 	static int burnout_counter = 0;
-	if(BMI->acc_y > BURNOUT_THRESHOLD && isRising_2 == 1 && rocketStatus < STAT_MOTOR_BURNOUT)
+	if(BMI->acc_y > BURNOUT_THRESHOLD && isRising_2 == 1 && burnout_counter < 101)
 	{
 		burnout_counter++;
 	}
 	if(burnout_counter == 100)
 	{
-		burnout_counter++;
 		rocketStatus = rocketStatus < STAT_MOTOR_BURNOUT ? STAT_MOTOR_BURNOUT : rocketStatus;
 		buzz();
 	}
@@ -139,7 +154,7 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	}
 
 	//Second Parachute
-	if(BME->altitude < SECOND_DEPLOY_ALTITUDE && isFalling_2 == 1 && is_secondP_OK == 0 && secondP_counter < 501 && rocketStatus < STAT_P1_OK_P2_OK)
+	if(BME->altitude < SECOND_DEPLOY_ALTITUDE && isFalling_2 == 1 && is_secondP_OK == 0)
 	{
 		secondP_counter++;
 	}
@@ -154,7 +169,8 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	}
 
 	//Touchdown Detection
-	if(sqrt(sqr(BMI->gyro_x) + sqr(BMI->gyro_y) + sqr(BMI->gyro_z)) < 10.0 && isFalling_2 == 1 && is_secondP_OK == 1 && rocketStatus < STAT_TOUCH_DOWN)
+	static uint8_t is_TD = 0;
+	if(sqrt(sqr(BMI->gyro_x) + sqr(BMI->gyro_y) + sqr(BMI->gyro_z)) < 10.0 && isFalling_2 == 1 && is_secondP_OK == 1 && is_TD == 0)
 	{
 			TD_counter++;
 	}
@@ -163,6 +179,7 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	}
 	if(TD_counter > 1000)
 	{
+		is_TD = 1;
 		rocketStatus = rocketStatus < STAT_TOUCH_DOWN ? STAT_TOUCH_DOWN : rocketStatus;
 			buzz();
 	}
