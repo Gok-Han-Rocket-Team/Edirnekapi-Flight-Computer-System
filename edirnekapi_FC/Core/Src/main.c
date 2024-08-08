@@ -41,7 +41,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define ALGORITHM_1
-//#define ALGORITHM_2
+#define ALGORITHM_2
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -240,7 +240,6 @@ int main(void)
 			 //sprintf((char*)buf, "roll:%f   pitch:%f   yaw:%f\n\r", roll, pitch, yaw);
 			 //sprintf((char*)buf, "irtifa: %.1f \t aci: %.0f \r\n", BME280_sensor.altitude, teta);
 			 //sprintf((char*)buf, "irtifa: %.1fm \t sicaklik %.0fC \t nem: %0.f%% \r\n", BME280_sensor.altitude, BME280_sensor.temperature, BME280_sensor.humidity);
-			 //HAL_I2C_Mem_Read(&hi2c3, ACC_I2C_ADD, ACC_CHIP_ID, 1, dat, I2C_MEMADD_SIZE_8BIT, 100);
 			 //sprintf((char*)buf, "chip id: %d\n\r", *dat);
 			 //sprintf((char*)buf, "%c", *dat);
 			 //sprintf((char*)buf, "sizeof float: %d   sizeof double: %d\r\n", sizeof(float), sizeof(double));
@@ -252,13 +251,12 @@ int main(void)
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
 			 lastTime = currentTime;
 		 }
-		 if(fabs(currentTime - lastTime2) > 5)
+		 if(fabs(currentTime - lastTime2) > 60)
 		 {
-			 //HAL_UART_Transmit(&huart4, (uint8_t*)"merhaba\n\r", 9, 250);
-			 //sprintf((char*)buf, "lat:%f\tlong:%f\ttime:%.0f\tsat:%d\r\n", gnss_data.lat, gnss_data.lon, gnss_data.timeDateBuf, gnss_data.satInUse);
-			 //sprintf((char*)buf, "acc counter: %d  dt:%f\r\n", counterAcc, BMI_sensor.deltaTime);
-			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
-			 //counterAcc = 0;
+			 if(rocketStatus == STAT_ROCKET_READY && sqrt(pow(BMI_sensor.gyro_x, 2) + pow(BMI_sensor.gyro_y, 2) + pow(BMI_sensor.gyro_z, 2)) < 5.0)
+			 {
+				 quaternionSet_zero();
+			 }
 			 lastTime2 = currentTime;
 		 }
 
@@ -268,14 +266,13 @@ int main(void)
 			 Usr_GpsL86GetValues(&gnss_data);
 			 //printDatas();
 		 }
+
 		 //Lora timer;
 		 currentTime = ((float)HAL_GetTick()) / 1000.0;
-
 		 if(fabs(currentTime - loraLastTime) > (1.0 / lora_hz))
 		 {
 			 getWatt();
 			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc, rocketStatus);
-			 //printDatas();
 			 loraLastTime = currentTime;
 		 }
   }

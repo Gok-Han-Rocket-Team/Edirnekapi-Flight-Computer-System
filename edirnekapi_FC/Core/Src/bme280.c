@@ -43,7 +43,7 @@ static void bme280_get_altitude()
 	float p_seaLevel = 1013.25;		//hPa
 	float alt = 44330.0 * (1.0 - pow((BME->pressure / p_seaLevel), (1.0 / 5.255)));
 	BME->altitude = alt - BME->baseAltitude;
-	if(BME->altitude > BME->maxAltitude)
+	if(BME->altitude > BME->maxAltitude && BME->baseAltitude != 0.0)
 	{
 		BME->maxAltitude = BME->altitude;
 	}

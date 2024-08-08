@@ -57,13 +57,13 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	veriler.dataYapi.lat = gps->lat;
 	veriler.dataYapi.lon = gps->lon;
 
-	veriler.dataYapi.gyroX = bmi->gyro_x;
-	veriler.dataYapi.gyroY = bmi->gyro_y;
-	veriler.dataYapi.gyroZ = bmi->gyro_z;
+	veriler.dataYapi.gyroX = -bmi->gyro_x;
+	veriler.dataYapi.gyroY = -bmi->gyro_z;
+	veriler.dataYapi.gyroZ = -bmi->gyro_y;
 
 	veriler.dataYapi.accX = bmi->acc_x / 1000;
-	veriler.dataYapi.accY = bmi->acc_y / 1000;
-	veriler.dataYapi.accZ = bmi->acc_z / 1000;
+	veriler.dataYapi.accY = bmi->acc_z / 1000;
+	veriler.dataYapi.accZ = (rocketStat > STAT_ROCKET_READY) ? (-bmi->acc_y / 1000) - 1.0 : bmi->acc_y / 1000;
 
 	veriler.dataYapi.uyduSayisi = ((uint8_t)gps->satInUse << 3) | (((int)euler[0] & 0x8000) >> 13) | (((int)euler[1] & 0x8000) >> 14) | (((int)euler[2] & 0x8000) >> 15);
 	veriler.dataYapi.hiz = (int16_t)(int)(bme->velocity * 10);
@@ -85,19 +85,22 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 		sendPC();
 	}
 #endif
+#ifndef ACTIVATE_RF
+	printDatas();
+#endif
 }
 
 void printDatas()
 {
 	static uint8_t bufferPrint[300];
 	  sprintf((char*)bufferPrint, "\r\n\n\n\r%X min: %d  sec: %d  stat: %d  volt: %.2f  mWatt/s: %d  temp: %.1f\r\n"
-			  "hum: %d  alt: %.1f  altGps: %.1f  lat: %f  lon: %f\r\n"
+			  "hum: %d  alt: %.1f maxAlt: %d altGps: %.1f  lat: %f  lon: %f\r\n"
 			  "angle: %.1f  pitch:%d  roll:%d  yaw:%d | real pitch: %.1f  roll: %.1f  yaw: %.1f\r\n"
 			  "sat:%d  velocity:%.1f  ivmeX:%.3f  ivmeY:%.3f  ivmeZ:%.3f   CRC: %d", veriler.dataYapi.basla,
 			  (veriler.dataYapi.zaman >> 2), ((veriler.dataYapi.zaman & 3) << 4) | (veriler.dataYapi.durum >> 4),
 			  veriler.dataYapi.durum & 0x0F, ((float)veriler.dataYapi.voltaj) / 100 ,
 			  veriler.dataYapi.akim , (float)veriler.dataYapi.sicaklik / 3, veriler.dataYapi.nem,
-			  veriler.dataYapi.yukseklik_p, veriler.dataYapi.yukseklik_gps, veriler.dataYapi.lat,
+			  veriler.dataYapi.yukseklik_p, (int)veriler.dataYapi.maxAltitude, veriler.dataYapi.yukseklik_gps, veriler.dataYapi.lat,
 			  veriler.dataYapi.lon, veriler.dataYapi.aci, (veriler.dataYapi.pitch * ((veriler.dataYapi.uyduSayisi & 0x04)?-1:1)),
 			  (veriler.dataYapi.roll * (((veriler.dataYapi.uyduSayisi & 0x02)?-1:1))),
 			  (veriler.dataYapi.yaw * ((veriler.dataYapi.uyduSayisi & 0x01)?-1:1)),
