@@ -31,8 +31,8 @@ void lora_configure(lorastruct *config)
     config->worCycle = LORA_WOR_4000;
 
     // Lora address
-    data[0] = config->loraAddress.address8[0];
-    data[1] = config->loraAddress.address8[1];
+    data[0] = config->loraAddress.address8[1];
+    data[1] = config->loraAddress.address8[0];
 
     // Lora netid
     data[2] = config->netId;
@@ -56,12 +56,11 @@ void lora_configure(lorastruct *config)
     data[6] = config->RSSI | config->transmissonMode | config->repeater | config->LBT | config->worMode | config->worCycle;
 
     // key
-    data[7] = config->loraKey.key8[0];
-    data[8] = config->loraKey.key8[1];
+    data[7] = config->loraKey.key8[1];
+    data[8] = config->loraKey.key8[0];
 
     send_command(0xC0, 0x00, 0x09, data);
 }
-
 
 
 

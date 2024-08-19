@@ -31,6 +31,8 @@
 #include "lora.h"
 #include "usr_gnss_l86_parser.h"
 #include "dataPacking.h"
+#include "externalPins.h"
+#include "configuration.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,8 +42,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define ALGORITHM_1
-#define ALGORITHM_2
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,7 +51,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
+ ADC_HandleTypeDef hadc1;
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
@@ -59,6 +60,7 @@ UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_uart4_tx;
+DMA_HandleTypeDef hdma_uart4_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
 
@@ -69,12 +71,17 @@ bmi088_struct_t BMI_sensor;
 static lorastruct e22_lora;
 static S_GPS_L86_DATA gnss_data;
 static power guc;
-// Free parameters in the Mahony filter and fusion scheme,
-// Kp for proportional feedback, Ki for integral
+uint8_t mosfet_buffer[3] = {0};
+volatile int is_updated_uart4 = 0;
+static ext_pin_s mos_1;		//parachute 1
+static ext_pin_s mos_2;		//parachute 2
+ext_pin_s led;
+ext_pin_s buzzer;
 
 extern float euler[3];
 extern uint8_t is_offset_taken;
 extern _f g_GnssRx_Flag;
+extern _f g_openFixedDataTransmition;
 float currentTime = 0;
 float lastTime =0;
 float lastTime2 =0;
@@ -110,6 +117,7 @@ static void bmiBegin();
 static void loraBegin();
 void measurePower(power *guc);
 void getWatt(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -157,7 +165,7 @@ int main(void)
   HAL_NVIC_DisableIRQ(EXTI4_IRQn);
 
   HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-  HAL_Delay(500);
+  HAL_Delay(1000);
   HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
   bmiBegin();
   bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_8);
@@ -174,6 +182,35 @@ int main(void)
   HAL_DMA_Init(&hdma_usart1_tx);
   HAL_DMA_Init(&hdma_usart2_rx);
   HAL_DMA_Init(&hdma_uart4_tx);
+  HAL_DMA_Init(&hdma_uart4_rx);
+  HAL_UART_Receive_DMA(&huart4, mosfet_buffer, 3);
+
+  mos_1.gpio_port = P_1_MOS_GPIO_Port;
+  mos_1.gpio_pin = P_1_MOS_Pin;
+  mos_2.gpio_port = P_2_MOS_GPIO_Port;
+  mos_2.gpio_pin = P_2_MOS_Pin;
+  led.gpio_port = LED_GPIO_Port;
+  led.gpio_pin = LED_Pin;
+  buzzer.gpio_port = BUZZER_GPIO_Port;
+  buzzer.gpio_pin = BUZZER_Pin;
+
+/*
+  while(1)
+  {
+	  if(is_updated_uart4 == 1)
+	  {
+		  if(strcmp((char*)mosfet_buffer, "OK1") == 0)
+		  {
+			  deploy_p_1();
+		  }
+		  if(strcmp((char*)mosfet_buffer, "OK2") == 0)
+		  {
+			  deploy_p_2();
+		  }
+		  is_updated_uart4 = 0;
+	  }
+  }
+*/
   // Timer'ı başlat
 
   //Bu makro gps verisini gözlemlemek içindir.
@@ -201,10 +238,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  buzzUpdate();
 	  bmi088_update();
 	  bme280_update();
 	  measurePower(&guc);
+
+	  ext_pin_update(&mos_1);
+	  ext_pin_update(&mos_2);
+	  ext_pin_update(&led);
+	  ext_pin_update(&buzzer);
+
+
 
 #if defined(ALGORITHM_1)
 	  algorithm_1_update(&BME280_sensor);
@@ -214,20 +257,41 @@ int main(void)
 	  algorithm_2_update(&BME280_sensor, &BMI_sensor, teta);
 #endif
 
-/*
-	 if (__HAL_UART_GET_FLAG(&huart4, UART_FLAG_RXNE) == SET) {
-		 uint8_t dat[1];
-		 HAL_UART_Receive(&huart4, (uint8_t *) dat, 1, 100);
-		 HAL_UART_Transmit(&huart1, (uint8_t *) dat, 1, 100);
-		 HAL_GPIO_TogglePin(Led_GPIO_Port, Led_Pin);
-	 }
-*/
 
-	  if(rocketStatus == STAT_FLIGHT_STARTED)
-		  lora_hz = 5;
 
-	  currentTime = ((float)HAL_GetTick()) / 1000.0;
+		  if(rocketStatus == STAT_FLIGHT_STARTED)
+			  lora_hz = 5;
 
+	  	  currentTime = ((float)HAL_GetTick()) / 1000.0;
+
+	  	 //Set initial quaternion every minute.
+		 if(fabs(currentTime - lastTime2) > 60)
+		 {
+			 if(rocketStatus == STAT_ROCKET_READY && sqrt(pow(BMI_sensor.gyro_x, 2) + pow(BMI_sensor.gyro_y, 2) + pow(BMI_sensor.gyro_z, 2)) < 5.0)
+			 {
+				 quaternionSet_zero();
+				 ext_pin_open_duration(&buzzer, 500);
+			 }
+			 lastTime2 = currentTime;
+		 }
+
+		 //GNSS get location
+		 if(g_GnssRx_Flag)
+		 {
+			 Usr_GpsL86GetValues(&gnss_data);
+		 }
+
+		 //Lora timer;
+		 currentTime = ((float)HAL_GetTick()) / 1000.0;
+		 if(fabs(currentTime - loraLastTime) > (1.0 / lora_hz))
+		 {
+			 getWatt();
+			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc, rocketStatus);
+			 loraLastTime = currentTime;
+		 }
+
+
+		 //some infos
 		 if(fabs(currentTime - lastTime) > 0.2)
 		 {
 			 //sprintf((char*)buf, "temp = %.2fC  time %.0fuS A_x: %.1fmG  A_y: %.1fm  A_z: %.1fmG   G_z: %fdps\r\n", BMI_sensor.temp, BMI_sensor.currentTime, BMI_sensor.acc_x, BMI_sensor.acc_y, BMI_sensor.acc_z, BMI_sensor.gyro_z);
@@ -250,30 +314,6 @@ int main(void)
 			 //sprintf((char*)buf, "speed = %f\n\r", BME280_sensor.velocity);
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
 			 lastTime = currentTime;
-		 }
-		 if(fabs(currentTime - lastTime2) > 60)
-		 {
-			 if(rocketStatus == STAT_ROCKET_READY && sqrt(pow(BMI_sensor.gyro_x, 2) + pow(BMI_sensor.gyro_y, 2) + pow(BMI_sensor.gyro_z, 2)) < 5.0)
-			 {
-				 quaternionSet_zero();
-			 }
-			 lastTime2 = currentTime;
-		 }
-
-		 //GNSS get location
-		 if(g_GnssRx_Flag)
-		 {
-			 Usr_GpsL86GetValues(&gnss_data);
-			 //printDatas();
-		 }
-
-		 //Lora timer;
-		 currentTime = ((float)HAL_GetTick()) / 1000.0;
-		 if(fabs(currentTime - loraLastTime) > (1.0 / lora_hz))
-		 {
-			 getWatt();
-			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc, rocketStatus);
-			 loraLastTime = currentTime;
 		 }
   }
 
@@ -572,6 +612,9 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
   /* DMA1_Stream4_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
@@ -600,24 +643,24 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, BUZZER_Pin|Led_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, P_1_MOS_Pin|P_2_MOS_Pin|LORA_M0_Pin|LORA_M1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, LORA_M0_Pin|LORA_M1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, BUZZER_Pin|LED_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : BUZZER_Pin Led_Pin */
-  GPIO_InitStruct.Pin = BUZZER_Pin|Led_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : LORA_M0_Pin LORA_M1_Pin */
-  GPIO_InitStruct.Pin = LORA_M0_Pin|LORA_M1_Pin;
+  /*Configure GPIO pins : P_1_MOS_Pin P_2_MOS_Pin LORA_M0_Pin LORA_M1_Pin */
+  GPIO_InitStruct.Pin = P_1_MOS_Pin|P_2_MOS_Pin|LORA_M0_Pin|LORA_M1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BUZZER_Pin LED_Pin */
+  GPIO_InitStruct.Pin = BUZZER_Pin|LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : INT_ACC_Pin INT_GYRO_Pin */
   GPIO_InitStruct.Pin = INT_ACC_Pin|INT_GYRO_Pin;
@@ -662,6 +705,22 @@ void loraBegin()
 	HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, RESET);
 	HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, SET);
 	HAL_Delay(100);
+/*
+    while(1){
+    	if(__HAL_UART_GET_FLAG(&huart4, UART_FLAG_RXNE) == SET) {
+			 uint8_t dat[1];
+			 HAL_UART_Receive(&huart4, (uint8_t *) dat, 1, 100);
+			 HAL_UART_Transmit(&huart1, (uint8_t *) dat, 1, 100);
+			 HAL_GPIO_TogglePin(Led_GPIO_Port, Led_Pin);
+   	 	 }
+   	 	 if(__HAL_UART_GET_FLAG(&huart1, UART_FLAG_RXNE) == SET) {
+			 uint8_t dat[1];
+			 HAL_UART_Receive(&huart1, (uint8_t *) dat, 1, 100);
+			 HAL_UART_Transmit(&huart4, (uint8_t *) dat, 1, 100);
+			 HAL_GPIO_TogglePin(Led_GPIO_Port, Led_Pin);
+   	 	 }
+    }
+*/
 	//while(!HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9));
 
     e22_lora.baudRate = LORA_BAUD_115200;
@@ -670,25 +729,20 @@ void loraBegin()
     e22_lora.power = LORA_POWER_37dbm;
     e22_lora.loraAddress.address16 = 0x0000;
     e22_lora.loraKey.key16 = 0x0000;
-    e22_lora.channel = 25;
+
+#ifdef ROCKET_CARD
+    e22_lora.channel = ROCKET_TELEM_FREQ;
+#else
+    e22_lora.channel = PAYLOAD_TELEM_FREQ;
+#endif
 
     lora_configure(&e22_lora);
-    /*
-    while(1){
-    	if(__HAL_UART_GET_FLAG(&huart4, UART_FLAG_RXNE) == SET) {
-   		 uint8_t dat[1];
-   		 HAL_UART_Receive(&huart4, (uint8_t *) dat, 1, 100);
-   		 HAL_UART_Transmit(&huart1, (uint8_t *) dat, 1, 100);
-   		 HAL_GPIO_TogglePin(Led_GPIO_Port, Led_Pin);
-   	 }
-    }
-    */
+
     HAL_Delay(100);
 
 	HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, RESET);
 	HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, RESET);
 }
-
 
 void measurePower(power *guc_)
 {
@@ -730,21 +784,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     }
 }
 
-void buzz()
+void deploy_p_1()
 {
-	buzzLastTime = HAL_GetTick();
+	ext_pin_open_duration(&mos_1, 100);
+	ext_pin_open(&buzzer);
 }
 
-void buzzUpdate()
+void deploy_p_2()
 {
-	if(HAL_GetTick() - buzzLastTime < 100)
-	{
-		HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
-	}
-	else
-	{
-		HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
-	}
+	ext_pin_open_duration(&mos_2, 100);
+	ext_pin_open(&buzzer);
 }
 
 /* USER CODE END 4 */
@@ -760,15 +809,15 @@ void Error_Handler(void)
 
 	sprintf((char*)buf, "error line: %d\r\n", errorLine);
 	HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
-	HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-	HAL_Delay(100);
-	HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-	HAL_Delay(100);
+
 
 	__disable_irq();
   while (1)
   {
-
+		HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
+		HAL_Delay(100);
+		HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
+		HAL_Delay(100);
   }
 
   /* USER CODE END Error_Handler_Debug */

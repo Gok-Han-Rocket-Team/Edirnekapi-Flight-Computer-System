@@ -59,8 +59,8 @@ typedef struct Power
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-void buzz();
-void buzzUpdate();
+void deploy_p_1();
+void deploy_p_2();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -68,10 +68,14 @@ void buzzUpdate();
 #define VOLTAGE_SENS_GPIO_Port GPIOC
 #define CURRENT_SENS_Pin GPIO_PIN_2
 #define CURRENT_SENS_GPIO_Port GPIOC
+#define P_1_MOS_Pin GPIO_PIN_3
+#define P_1_MOS_GPIO_Port GPIOC
 #define BUZZER_Pin GPIO_PIN_12
 #define BUZZER_GPIO_Port GPIOB
-#define Led_Pin GPIO_PIN_13
-#define Led_GPIO_Port GPIOB
+#define LED_Pin GPIO_PIN_13
+#define LED_GPIO_Port GPIOB
+#define P_2_MOS_Pin GPIO_PIN_7
+#define P_2_MOS_GPIO_Port GPIOC
 #define LORA_M0_Pin GPIO_PIN_10
 #define LORA_M0_GPIO_Port GPIOC
 #define LORA_M1_Pin GPIO_PIN_11
@@ -83,7 +87,6 @@ void buzzUpdate();
 #define INT_GYRO_GPIO_Port GPIOB
 #define INT_GYRO_EXTI_IRQn EXTI4_IRQn
 /* USER CODE BEGIN Private defines */
-#define ACTIVATE_RF
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

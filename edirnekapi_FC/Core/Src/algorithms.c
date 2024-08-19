@@ -79,7 +79,7 @@ void algorithm_1_update(BME_280_t* BME)
 	  isRising = 1;
 	  algorithm_1_start_time_u32 = HAL_GetTick();
 	  rocketStatus = rocketStatus < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : rocketStatus;
-	  buzz();
+	  ext_pin_open(&buzzer);
 	}
 
 	//Falling detection || First parachute
@@ -92,11 +92,11 @@ void algorithm_1_update(BME_280_t* BME)
 	  fallingCounter = 0;
 	}
 
-	if(fallingCounter == 1 && isRising == 1 && isFalling == 0 && BME->altitude > FIRST_DEPLOY_ARM_ALT)
+	if(fallingCounter == 1 && isRising == 1 && isFalling == 0 && BME->altitude > ARMING_ALTITUDE_1)
 	{
 	  isFalling = 1;
 	  rocketStatus = rocketStatus < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : rocketStatus;
-	  buzz();
+	  deploy_p_1();
 	}
 
 	//Second Parachute
@@ -114,7 +114,7 @@ void algorithm_1_update(BME_280_t* BME)
 	{
 		rocketStatus = rocketStatus < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : rocketStatus;
 		is_second_p_OK_1 = 1;
-		buzz();
+		deploy_p_2();
 	}
   }
 }
@@ -130,27 +130,27 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 
 		isRising_2 = 1;
 		rocketStatus = rocketStatus < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : rocketStatus;
-		buzz();
+		ext_pin_open(&buzzer);
 	}
 
 	//Burnout detection
 	static int burnout_counter = 0;
-	if(BMI->acc_y > BURNOUT_THRESHOLD && isRising_2 == 1 && burnout_counter < 101)
+	if(BMI->acc_y < BURNOUT_THRESHOLD && isRising_2 == 1 && burnout_counter < 101)
 	{
 		burnout_counter++;
 	}
-	if(burnout_counter == 100)
+	if(burnout_counter == 10)
 	{
 		rocketStatus = rocketStatus < STAT_MOTOR_BURNOUT ? STAT_MOTOR_BURNOUT : rocketStatus;
-		buzz();
+		ext_pin_open(&buzzer);
 	}
 
 	//Falling detection || First parachute
-	if(angle > ANGLE_THRESHOLD && isRising_2 == 1 && isFalling_2 == 0 && BME->altitude > ARMING_ALTITUDE)
+	if(angle > ANGLE_THRESHOLD && isRising_2 == 1 && isFalling_2 == 0 && BME->altitude > ARMING_ALTITUDE_2)
 	{
 		isFalling_2 = 1;
 		rocketStatus = rocketStatus < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : rocketStatus;
-		buzz();
+		deploy_p_1();
 	}
 
 	//Second Parachute
@@ -161,11 +161,11 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	else{
 		secondP_counter = 0;
 	}
-	if(secondP_counter == 500)
+	if(secondP_counter == 10)
 	{
 		rocketStatus = rocketStatus < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : rocketStatus;
 		is_secondP_OK = 1;
-		buzz();
+		deploy_p_2();
 	}
 
 	//Touchdown Detection
@@ -181,6 +181,6 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	{
 		is_TD = 1;
 		rocketStatus = rocketStatus < STAT_TOUCH_DOWN ? STAT_TOUCH_DOWN : rocketStatus;
-			buzz();
+		ext_pin_open(&buzzer);
 	}
 }

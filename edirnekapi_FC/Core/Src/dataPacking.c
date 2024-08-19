@@ -17,7 +17,10 @@ static void sendRF()
 {
 	if (HAL_DMA_GetState(&hdma_uart4_tx) != HAL_DMA_STATE_BUSY)
 	{
+		//HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, SET);
+		//HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, SET);
 		HAL_UART_Transmit_DMA(&huart4, veriler.arr, sizeof(veriler.dataYapi));
+		//HAL_UART_Transmit_DMA(&huart4, "hello\n\r", 7);
 	}
 }
 
@@ -77,15 +80,16 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	veriler.dataYapi.CR	= '\r';
 	veriler.dataYapi.LF	= '\n';
 
-#ifdef ACTIVATE_RF
-	if(guc->voltaj > 8.0){
+#ifdef PRINT_DECODED
+	if(guc->voltaj > LOW_BAT){
 		sendRF();
+		sendPC();
 	}
 	else{
 		sendPC();
 	}
 #endif
-#ifndef ACTIVATE_RF
+#ifndef PRINT_DECODED
 	printDatas();
 #endif
 }

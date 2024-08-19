@@ -12,6 +12,9 @@
 
 extern DMA_HandleTypeDef hdma_usart2_rx;
 extern UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart4;
+extern uint8_t* mosfet_buffer;
+extern uint8_t is_updated_uart4;
 typedef enum
 {
     NO_ERROR_STATE,
@@ -73,8 +76,16 @@ ErrorCode error = NO_ERROR_STATE;
 //============================= Callback section
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-	g_GnssRx_Flag = true;
-	g_openFixedDataTransmition = true;
+	if(huart == &huart2)
+	{
+		g_GnssRx_Flag = true;
+		g_openFixedDataTransmition = true;
+	}
+	if(huart == &huart4)
+	{
+		is_updated_uart4 = 1;
+		HAL_UART_Receive_DMA(&huart4, mosfet_buffer, 3);
+	}
 	//HAL_UART_Transmit(&huart1, m_rxData, strlen(m_rxData), 100);
 }
 
@@ -83,7 +94,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
 void UsrGpsL86Init(UART_HandleTypeDef *huart)
 {
-
     HAL_UART_Receive_DMA(huart, (uint8_t *)m_rxData, DMA_READ_DEF_SIZE);
 }
 

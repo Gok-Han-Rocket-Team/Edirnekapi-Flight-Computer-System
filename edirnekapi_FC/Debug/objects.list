@@ -2,6 +2,7 @@
 "./Core/Src/bme280.o"
 "./Core/Src/bmi088.o"
 "./Core/Src/dataPacking.o"
+"./Core/Src/externalPins.o"
 "./Core/Src/lora.o"
 "./Core/Src/main.o"
 "./Core/Src/queternion.o"

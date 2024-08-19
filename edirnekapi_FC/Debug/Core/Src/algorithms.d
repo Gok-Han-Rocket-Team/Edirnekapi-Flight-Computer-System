@@ -31,7 +31,8 @@ Core/Src/algorithms.o: ../Core/Src/algorithms.c ../Core/Inc/algorithms.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Core/Inc/bme280.h ../Core/Inc/main.h
+ ../Core/Inc/bme280.h ../Core/Inc/main.h ../Core/Inc/externalPins.h \
+ ../Core/Inc/configuration.h
 ../Core/Inc/algorithms.h:
 ../Core/Inc/bmi088.h:
 ../Core/Inc/main.h:
@@ -68,3 +69,5 @@ Core/Src/algorithms.o: ../Core/Src/algorithms.c ../Core/Inc/algorithms.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
 ../Core/Inc/bme280.h:
 ../Core/Inc/main.h:
+../Core/Inc/externalPins.h:
+../Core/Inc/configuration.h:
