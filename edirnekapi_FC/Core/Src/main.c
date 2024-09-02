@@ -33,6 +33,8 @@
 #include "dataPacking.h"
 #include "externalPins.h"
 #include "configuration.h"
+#include "reset_detect.h"
+#include "strain_gauge.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +58,8 @@
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
 
+RTC_HandleTypeDef hrtc;
+
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
@@ -78,6 +82,13 @@ static ext_pin_s mos_2;		//parachute 2
 ext_pin_s led;
 ext_pin_s buzzer;
 
+#ifndef ROCKET_CARD
+hx711_t loadcell;
+#endif
+
+RTC_TimeTypeDef sTime;
+RTC_DateTypeDef sDate;
+
 extern float euler[3];
 extern uint8_t is_offset_taken;
 extern _f g_GnssRx_Flag;
@@ -89,16 +100,22 @@ float powerLastTime = 0;
 float loraLastTime = 0;
 float lora_hz = 1.0;
 float wattLastTime = 0;
+volatile float teta = 0;
 
 extern int errorLine;
 
 int counter = 0;
 int counterAcc = 0;
 int counterGy = 0;
+int configBmi = 0;
+int is_BME_ok = 0;
+int is_BMI_ok = 0;
+
 uint32_t buzzLastTime = 0;
 
 uint8_t buf[250];
-uint8_t rocketStatus = 255;
+
+backup_sram_datas_s *saved_datas = (backup_sram_datas_s *)BKPSRAM_BASE;
 
 /* USER CODE END PV */
 
@@ -112,8 +129,10 @@ static void MX_USART2_UART_Init(void);
 static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_UART4_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
-static void bmiBegin();
+static void bme280_begin();
+static void bmi088_begin();
 static void loraBegin();
 void measurePower(power *guc);
 void getWatt(void);
@@ -159,25 +178,63 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_UART4_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 2, 0);
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
 
-  HAL_NVIC_DisableIRQ(EXTI3_IRQn);
-  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
+  HAL_PWR_EnableBkUpAccess();
+  RCC->AHB1ENR |= RCC_AHB1ENR_BKPSRAMEN;
+  HAL_PWR_EnableBkUpReg();
 
-  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-  HAL_Delay(1000);
-  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-  bmiBegin();
-  bme280_init(&BME280_sensor, &hi2c1, BME280_MODE_NORMAL, BME280_OS_8, BME280_FILTER_8);
-  loraBegin();
-  HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,57600*2C\r\n", 19, 100);
-  //HAL_UART_Transmit(&huart2, "$PMTK251,9600*17\r\n", 18, 100);				// 9600 bps
+  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+  HAL_Delay(5);
+  bme280_begin();
+  bmi088_begin();
+
+#ifndef	ROCKET_CARD
+  straing_gage_gpio_init(&loadcell, GPIO_0_GPIO_Port, GPIO_0_Pin, GPIO_1_GPIO_Port, GPIO_1_Pin);
+#endif
+
+  if(measure_abs_time(sTime, sDate) > 1)
+  {
+	  if(is_BMI_ok)
+		  bmi088_config();
+	  if(is_BME_ok)
+		  bme280_config();
+
+	  saved_datas->r_status = STAT_ROCKET_READY;
+	  saved_datas->max_altitude = 0.0;
+	  saved_datas->offset_vals[0] = 0.0;
+	  saved_datas->offset_vals[1] = 0.0;
+	  saved_datas->offset_vals[2] = 0.0;
+	  saved_datas->q[0] = 0.0;
+	  saved_datas->q[1] = 0.0;
+	  saved_datas->q[2] = 0.0;
+	  saved_datas->q[3] = 0.0;
+
+	  for(int i = 0; i < 20; i++)
+	  {
+		  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
+		  HAL_Delay(50);
+	  }
+
+	  loraBegin();
+	  HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,57600*2C\r\n", 19, 100);
+	  //HAL_UART_Transmit(&huart2, "$PMTK251,9600*17\r\n", 18, 100);				// 9600 bps
+	  if(is_BMI_ok)
+		  getOffset();
+
+	  HAL_Delay(10);
+  }
+
   HAL_UART_DeInit(&huart4);
   HAL_UART_DeInit(&huart2);
-  HAL_Delay(10);
   huart4.Init.BaudRate = 115200;
   huart2.Init.BaudRate = 57600;
-  HAL_UART_Init(&huart4);					//telemetri
+  HAL_UART_Init(&huart4);					//Telemetry
   HAL_UART_Init(&huart2);					//GNSS
   HAL_DMA_Init(&hdma_usart1_tx);
   HAL_DMA_Init(&hdma_usart2_rx);
@@ -194,52 +251,34 @@ int main(void)
   buzzer.gpio_port = BUZZER_GPIO_Port;
   buzzer.gpio_pin = BUZZER_Pin;
 
-/*
-  while(1)
-  {
-	  if(is_updated_uart4 == 1)
-	  {
-		  if(strcmp((char*)mosfet_buffer, "OK1") == 0)
-		  {
-			  deploy_p_1();
-		  }
-		  if(strcmp((char*)mosfet_buffer, "OK2") == 0)
-		  {
-			  deploy_p_2();
-		  }
-		  is_updated_uart4 = 0;
-	  }
-  }
-*/
-  // Timer'ı başlat
+  //Interrupt activation for IMU sensor.
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+  loraLastTime = -1.0;
 
-  //Bu makro gps verisini gözlemlemek içindir.
+  //This macro for viewing the gps raw data.
   //VIEW_GPS()
 
-  getOffset();
-
   UsrGpsL86Init(&huart2);
-  HAL_Delay(200);
-  rocketStatus = STAT_ROCKET_READY;
-  for(int i = 0; i < 5 ; i++)
-  {
-	  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
-	  HAL_Delay(200);
-  }
-  HAL_Delay(900);
-  HAL_GPIO_TogglePin(BUZZER_GPIO_Port, BUZZER_Pin);
 
+  ext_pin_open_duration(&buzzer, 1000);
+  BMI_sensor.rawDatas.isGyroUpdated = 0;
+  BMI_sensor.rawDatas.isAccelUpdated = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  bmi088_update();
-	  bme280_update();
+	  if(is_BMI_ok)
+		  bmi088_update();
+	  if(is_BME_ok)
+		  bme280_update();
+
 	  measurePower(&guc);
 
 	  ext_pin_update(&mos_1);
@@ -250,24 +289,24 @@ int main(void)
 
 
 #if defined(ALGORITHM_1)
-	  algorithm_1_update(&BME280_sensor);
+	  if(is_BME_ok)
+		  algorithm_1_update(&BME280_sensor);
 #endif
 #if defined(ALGORITHM_2)
-	  float teta = quaternionToTheta();
-	  algorithm_2_update(&BME280_sensor, &BMI_sensor, teta);
+	  teta = quaternionToTheta();
+	  if(is_BMI_ok)
+		  algorithm_2_update(&BME280_sensor, &BMI_sensor, teta);
 #endif
 
-
-
-		  if(rocketStatus == STAT_FLIGHT_STARTED)
-			  lora_hz = 5;
+		  if(saved_datas->r_status == STAT_FLIGHT_STARTED){lora_hz = 5;}
+		  else if(saved_datas->r_status > STAT_MOTOR_BURNOUT){lora_hz = 1;}
 
 	  	  currentTime = ((float)HAL_GetTick()) / 1000.0;
 
 	  	 //Set initial quaternion every minute.
 		 if(fabs(currentTime - lastTime2) > 60)
 		 {
-			 if(rocketStatus == STAT_ROCKET_READY && sqrt(pow(BMI_sensor.gyro_x, 2) + pow(BMI_sensor.gyro_y, 2) + pow(BMI_sensor.gyro_z, 2)) < 5.0)
+			 if(saved_datas->r_status == STAT_ROCKET_READY && sqrt(pow(BMI_sensor.gyro_x, 2) + pow(BMI_sensor.gyro_y, 2) + pow(BMI_sensor.gyro_z, 2)) < 5.0 && is_BMI_ok == 1)
 			 {
 				 quaternionSet_zero();
 				 ext_pin_open_duration(&buzzer, 500);
@@ -282,12 +321,15 @@ int main(void)
 		 }
 
 		 //Lora timer;
+		 //loop_counter += 1;
 		 currentTime = ((float)HAL_GetTick()) / 1000.0;
 		 if(fabs(currentTime - loraLastTime) > (1.0 / lora_hz))
 		 {
+			 //BME280_sensor.velocity = (float)(loop_counter);
 			 getWatt();
-			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc, rocketStatus);
+			 packDatas(&BMI_sensor, &BME280_sensor, &gnss_data, &guc, saved_datas->r_status);
 			 loraLastTime = currentTime;
+			 //loop_counter = 0;
 		 }
 
 
@@ -313,8 +355,33 @@ int main(void)
 			 //sprintf((char*)buf, "teta = %f", teta);
 			 //sprintf((char*)buf, "speed = %f\n\r", BME280_sensor.velocity);
 			 //HAL_UART_Transmit(&huart1, buf, strlen((char*) buf), 250);
+			 HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+			 HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+			 save_time(sTime, sDate);
 			 lastTime = currentTime;
 		 }
+
+		 //This block is used for manual deploy via telemetry for testing.
+		if(is_updated_uart4 == 1)
+		{
+			//ext_pin_open(&buzzer);
+		  if(strcmp((char*)mosfet_buffer, "OK1") == 0)
+		  {
+			  deploy_p_1();
+			  ext_pin_open(&led);
+		  }
+		  if(strcmp((char*)mosfet_buffer, "OK2") == 0)
+		  {
+			  deploy_p_2();
+			  ext_pin_open(&led);
+		  }
+		  is_updated_uart4 = 0;
+		}
+
+
+
+
+
   }
 
   /* USER CODE END 3 */
@@ -337,8 +404,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
@@ -503,6 +571,41 @@ static void MX_I2C3_Init(void)
 }
 
 /**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
+
+}
+
+/**
   * @brief UART4 Initialization Function
   * @param None
   * @retval None
@@ -637,8 +740,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
@@ -646,7 +749,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, P_1_MOS_Pin|P_2_MOS_Pin|LORA_M0_Pin|LORA_M1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, BUZZER_Pin|LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_0_Pin|GPIO_1_Pin|BUZZER_Pin|LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : P_1_MOS_Pin P_2_MOS_Pin LORA_M0_Pin LORA_M1_Pin */
   GPIO_InitStruct.Pin = P_1_MOS_Pin|P_2_MOS_Pin|LORA_M0_Pin|LORA_M1_Pin;
@@ -655,8 +758,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : BUZZER_Pin LED_Pin */
-  GPIO_InitStruct.Pin = BUZZER_Pin|LED_Pin;
+  /*Configure GPIO pins : GPIO_0_Pin GPIO_1_Pin BUZZER_Pin LED_Pin */
+  GPIO_InitStruct.Pin = GPIO_0_Pin|GPIO_1_Pin|BUZZER_Pin|LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -668,23 +771,27 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB9 */
-  GPIO_InitStruct.Pin = GPIO_PIN_9;
+  /*Configure GPIO pin : LORA_AUX_Pin */
+  GPIO_InitStruct.Pin = LORA_AUX_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(LORA_AUX_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 2, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
-  HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
-  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
 }
 
 /* USER CODE BEGIN 4 */
-void bmiBegin()
+
+void bme280_begin()
+{
+	BME280_sensor.device_config.bme280_filter = 			BME280_FILTER_8;
+	BME280_sensor.device_config.bme280_mode =				BME280_MODE_NORMAL;
+	BME280_sensor.device_config.bme280_output_speed =		BME280_OS_8;
+	bme280_init(&BME280_sensor, &hi2c1);
+}
+void bmi088_begin()
 {
 	//Acccel config
 	BMI_sensor.deviceConfig.acc_bandwith = ACC_BWP_OSR4;

@@ -6,35 +6,37 @@
  */
 #include "queternion.h"
 #include "math.h"
+#include "reset_detect.h"
 
-static float q[4];
+extern backup_sram_datas_s *saved_datas;
+
 float euler[3];		//pitch roll yaw
 
 void updateQuaternion(float gx, float gy, float gz, float dt) {
   // Convert angular velocities to quaternion rates of change
-  float qDot1 = 0.5f * (-q[1] * gx - q[2] * gy - q[3] * gz);
-  float qDot2 = 0.5f * (q[0] * gx + q[2] * gz - q[3] * gy);
-  float qDot3 = 0.5f * (q[0] * gy - q[1] * gz + q[3] * gx);
-  float qDot4 = 0.5f * (q[0] * gz + q[1] * gy - q[2] * gx);
+  float qDot1 = 0.5f * (-saved_datas->q[1] * gx - saved_datas->q[2] * gy - saved_datas->q[3] * gz);
+  float qDot2 = 0.5f * (saved_datas->q[0] * gx + saved_datas->q[2] * gz - saved_datas->q[3] * gy);
+  float qDot3 = 0.5f * (saved_datas->q[0] * gy - saved_datas->q[1] * gz + saved_datas->q[3] * gx);
+  float qDot4 = 0.5f * (saved_datas->q[0] * gz + saved_datas->q[1] * gy - saved_datas->q[2] * gx);
 
   // Integrate to get new quaternion values
-  q[0] += qDot1 * dt;
-  q[1] += qDot2 * dt;
-  q[2] += qDot3 * dt;
-  q[3] += qDot4 * dt;
+  saved_datas->q[0] += qDot1 * dt;
+  saved_datas->q[1] += qDot2 * dt;
+  saved_datas->q[2] += qDot3 * dt;
+  saved_datas->q[3] += qDot4 * dt;
 
   // Normalize quaternion to prevent drift
-  float norm = sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
-  q[0] /= norm;
-  q[1] /= norm;
-  q[2] /= norm;
-  q[3] /= norm;
+  float norm = sqrt(saved_datas->q[0] * saved_datas->q[0] + saved_datas->q[1] * saved_datas->q[1] + saved_datas->q[2] * saved_datas->q[2] + saved_datas->q[3] * saved_datas->q[3]);
+  saved_datas->q[0] /= norm;
+  saved_datas->q[1] /= norm;
+  saved_datas->q[2] /= norm;
+  saved_datas->q[3] /= norm;
 }
 
 void quaternionToEuler(void) {
-  euler[1] = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), 1.0f - 2.0f * (q[1] * q[1] + q[2] * q[2])) * (180.0 / M_PI);
-  euler[0] = asin(2.0f * (q[0] * q[2] - q[3] * q[1])) * (180.0 / M_PI);
-  euler[2] = atan2(2.0f * (q[0] * q[3] + q[1] * q[2]), 1.0f - 2.0f * (q[2] * q[2] + q[3] * q[3])) * (180.0 / M_PI);
+  euler[1] = atan2(2.0f * (saved_datas->q[0] * saved_datas->q[1] + saved_datas->q[2] * saved_datas->q[3]), 1.0f - 2.0f * (saved_datas->q[1] * saved_datas->q[1] + saved_datas->q[2] * saved_datas->q[2])) * (180.0 / M_PI);
+  euler[0] = asin(2.0f * (saved_datas->q[0] * saved_datas->q[2] - saved_datas->q[3] * saved_datas->q[1])) * (180.0 / M_PI);
+  euler[2] = atan2(2.0f * (saved_datas->q[0] * saved_datas->q[3] + saved_datas->q[1] * saved_datas->q[2]), 1.0f - 2.0f * (saved_datas->q[2] * saved_datas->q[2] + saved_datas->q[3] * saved_datas->q[3])) * (180.0 / M_PI);
 }
 
 
@@ -42,9 +44,9 @@ float quaternionToTheta(){
 
 	float theta = 0.0;
 
-	float r13 = 2 * q[1] * q[3] + 2 * q[2] * q[0];
-	float r23 = 2 * q[2] * q[3] - 2 * q[1] * q[0];
-	float r33 = 1 - 2 * q[1] * q[1] - 2 * q[2] * q[2];
+	float r13 = 2 * saved_datas->q[1] * saved_datas->q[3] + 2 * saved_datas->q[2] * saved_datas->q[0];
+	float r23 = 2 * saved_datas->q[2] * saved_datas->q[3] - 2 * saved_datas->q[1] * saved_datas->q[0];
+	float r33 = 1 - 2 * saved_datas->q[1] * saved_datas->q[1] - 2 * saved_datas->q[2] * saved_datas->q[2];
 
 	float z_x = r13;
 	float z_y = r23;
@@ -83,10 +85,10 @@ static void getInitialQuaternion() {
 
     norm = sqrt(q_temp[0] * q_temp[0] + q_temp[1] * q_temp[1] + q_temp[2] * q_temp[2] + q_temp[3] * q_temp[3]);
 
-    q[0] = q_temp[0] / norm;
-    q[1] = q_temp[1] / norm;
-    q[2] = q_temp[2] / norm;
-    q[3] = 0.0f;
+    saved_datas->q[0] = q_temp[0] / norm;
+    saved_datas->q[1] = q_temp[1] / norm;
+    saved_datas->q[2] = q_temp[2] / norm;
+    saved_datas->q[3] = 0.0f;
 }
 
 

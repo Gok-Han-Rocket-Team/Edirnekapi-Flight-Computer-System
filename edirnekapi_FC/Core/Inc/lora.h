@@ -112,6 +112,7 @@ typedef struct Lorastruct {
 // Lora yapılandırmasını data dizisine yazarü
 
 void lora_configure(lorastruct *config);
-
+void lora_activate();
+void lora_deactivate();
 #endif
 

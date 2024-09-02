@@ -15,6 +15,18 @@ static void send_command(uint8_t header, uint8_t addresses, uint8_t dataLength, 
     HAL_UART_Transmit(&huart4, command, 12, 100);
 }
 
+void lora_activate()
+{
+	HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, RESET);
+	HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, RESET);
+}
+
+void lora_deactivate()
+{
+	HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, SET);
+	HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, SET);
+}
+
 void lora_configure(lorastruct *config)
 {
 	uint8_t data[9];

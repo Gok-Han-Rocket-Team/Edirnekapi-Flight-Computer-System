@@ -8,6 +8,7 @@
 #include "bmi088.h"
 #include "math.h"
 #include "queternion.h"
+#include "reset_detect.h"
 
 //#define SELFTEST_ENABLED
 
@@ -21,10 +22,11 @@ uint8_t is_gyro_offset = 0;
 int errorLine = 0;
 
 double g[2][3] = {0};		//offset array for calculating offset.
-double offset_vals_d[3] = {0};	//Offset values for sensor;
 
-
+extern backup_sram_datas_s *saved_datas;
 extern UART_HandleTypeDef huart1;
+extern backup_sram_datas_s *saved_datas;
+extern int is_BMI_ok;
 
 #ifdef SELFTEST_ENABLED
 #include <string.h>
@@ -84,17 +86,8 @@ static void bmi088_selfTest()
 	HAL_Delay(70);	//wait for steady state.
 	if(retVal != HAL_OK)
 		Error_Handler();
-}
-#endif
 
-void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
-{
-	//quaternionSet_zero();
-	HAL_StatusTypeDef retVal = HAL_OK;
-	bmi_I2C = I2C_;
-	BMI = BMI_;
-	BMI->rawDatas.isGyroUpdated = 0;
-	BMI->rawDatas.isAccelUpdated = 0;
+
 
 #ifdef SELFTEST_ENABLED
 	bmi088_selfTest();
@@ -105,11 +98,30 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 	HAL_UART_Transmit(&huart1, buffer, strlen((char*) buffer), 50);
 	while(1);
 #endif
+
+}
+#endif
+
+/*
+static void bmi088_poke()
+{
+
+	HAL_I2C_DeInit(bmi_I2C);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, RESET);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, RESET);
+	HAL_Delay(1000);
+	HAL_I2C_Init(bmi_I2C);
+
+}
+*/
+void bmi088_config()
+{
+	HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+	HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+	HAL_StatusTypeDef retVal = HAL_OK;
 	uint8_t buf[1];
 
-	HAL_Delay(10);
-
-	buf[0] = 0x01;
+	buf[0] = ACC_PWR_SAVE_ULTRA;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_PWR_CONF, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); // power save ultra
 
 	buf[0] = ACC_DISABLE;
@@ -119,39 +131,22 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 	buf[0] = ACC_RESET;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); // Accel reset
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
-	HAL_Delay(40);
+	HAL_Delay(10);
 
 	buf[0] = FIFO_RESET;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_SOFTRESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); // FIFO reset
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
-	HAL_Delay(40);
+	HAL_Delay(10);
 
 	buf[0] = GYRO_RESET;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_SOFT_RESET, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); //Gyro reset
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
-	HAL_Delay(40);
-
-	HAL_I2C_DeInit(bmi_I2C);  // I2C arayüzünü de-initialize edin
-	HAL_Delay(5);
-	HAL_I2C_Init(bmi_I2C);    // I2C arayüzünü yeniden initialize edin
-	HAL_Delay(5);
-/*
-	//accel interrupt renew
-	buf[0] = (0x00);
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_INT1_IO_CTRL, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //accel interrupt config.
-	retVal != HAL_OK ? errorLine =__LINE__ : 0;
-
-	buf[0] = (0x00);
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_INT_MAP_DATA, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //accel interrupt DRDY map to pin1.
-	retVal != HAL_OK ? errorLine =__LINE__ : 0;
-	HAL_Delay(40);
-*/
+	HAL_Delay(10);
 
 	//Gyroscope configuration.
 	buf[0] = BMI->deviceConfig.gyro_range;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_RANGE, I2C_MEMADD_SIZE_8BIT, buf, 1, 100); //Gyro range config
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
-
 
 	buf[0] = BMI->deviceConfig.gyro_bandWidth;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_BANDWITH, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //Gyro bandwidth config
@@ -160,7 +155,7 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 	buf[0] = BMI->deviceConfig.gyro_powerMode;
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_LPM1, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //Gyro power mode config.
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
-	HAL_Delay(40);
+	HAL_Delay(20);
 
 	//gyro interrupt
 	buf[0] = GYRO_INT_ENABLE;
@@ -203,92 +198,117 @@ void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
 	retVal |= HAL_I2C_Mem_Write(bmi_I2C, ACC_I2C_ADD, ACC_INT_MAP_DATA, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //accel interrupt DRDY map to pin1.
 	//retVal != HAL_OK ? errorLine =__LINE__ : 0;
 
-	//HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 	HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 	HAL_NVIC_EnableIRQ(EXTI4_IRQn);
-	//if(retVal != HAL_OK)
+}
 
-		//Error_Handler();
+void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_)
+{
+	//quaternionSet_zero();
+	bmi_I2C = I2C_;
+	BMI = BMI_;
+	BMI->rawDatas.isGyroUpdated = 0;
+	BMI->rawDatas.isAccelUpdated = 0;
+	isTimeUpdated = 0;
+	isStarded = 0;
+	uint8_t buf[1];
 
+	HAL_I2C_Mem_Read(I2C_, GYRO_I2C_ADD, GYRO_CHIP_ID, I2C_MEMADD_SIZE_8BIT, buf, 1, 50);
+	if(*buf == 0x0F){
+		is_BMI_ok = 1;
+	}
+	else{
+		is_BMI_ok = 0;
+		saved_datas->q[0] = 1;
+		saved_datas->q[1] = 0;
+		saved_datas->q[2] = 0;
+		saved_datas->q[3] = 0;
+	}
 }
 void bmi088_update()
 {
+	HAL_StatusTypeDef ret_val = HAL_OK;
 
-	if(BMI->rawDatas.isAccelUpdated)
-	{
-		HAL_StatusTypeDef retVal = HAL_I2C_Mem_Read(bmi_I2C, ACC_I2C_ADD, ACC_X_LSB, I2C_MEMADD_SIZE_8BIT, BMI->rawDatas.accel, 9, 20);
-		HAL_I2C_Mem_Read(bmi_I2C, ACC_I2C_ADD, ACC_TEMP_MSB, I2C_MEMADD_SIZE_8BIT, BMI->rawDatas.temp, 2, 20);
+		if(BMI->rawDatas.isAccelUpdated)
+		{
+			ret_val = HAL_I2C_Mem_Read(bmi_I2C, ACC_I2C_ADD, ACC_X_LSB, I2C_MEMADD_SIZE_8BIT, BMI->rawDatas.accel, 9, 20);
+			if(ret_val)
+				return;
+			HAL_I2C_Mem_Read(bmi_I2C, ACC_I2C_ADD, ACC_TEMP_MSB, I2C_MEMADD_SIZE_8BIT, BMI->rawDatas.temp, 2, 20);
 
-		uint16_t Temp_uint11 = (BMI->rawDatas.temp[0] << 3) | (BMI->rawDatas.temp[1] >> 5);
-		int16_t Temp_int11 = 0;
-		if (Temp_uint11 > 1023){
-			Temp_int11 = Temp_uint11 - 2048;
+			uint16_t Temp_uint11 = (BMI->rawDatas.temp[0] << 3) | (BMI->rawDatas.temp[1] >> 5);
+			int16_t Temp_int11 = 0;
+			if (Temp_uint11 > 1023){
+				Temp_int11 = Temp_uint11 - 2048;
+			}
+			else{
+				Temp_int11 = Temp_uint11;
+				BMI->temp = (float)Temp_int11 * 0.125 + 23.0;
+			}
+			uint32_t sensorTime = (BMI->rawDatas.accel[8] << 16) | (BMI->rawDatas.accel[7] << 8) | BMI->rawDatas.accel[6];
+
+			BMI->currentTime= (float)sensorTime * 39.0625 / 1000000.0;
+
+			int16_t acc_z_16 = (BMI->rawDatas.accel[5] << 8) | BMI->rawDatas.accel[4];
+			int16_t acc_y_16 = (BMI->rawDatas.accel[3] << 8) | BMI->rawDatas.accel[2];
+			int16_t acc_x_16 = (BMI->rawDatas.accel[1] << 8) | BMI->rawDatas.accel[0];
+
+			BMI->acc_z = (float)acc_z_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_Z_OFFSET;
+			BMI->acc_y = (float)acc_y_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_Y_OFFSET;
+			BMI->acc_x = (float)acc_x_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_X_OFFSET;
+
+			if(isStarded)
+			{
+				BMI->deltaTime = BMI->currentTime - BMI->lastTime < 0 ? 0.0 : BMI->currentTime - BMI->lastTime;
+			}
+			else
+			{
+				isStarded++;
+			}
+				BMI->lastTime = BMI->currentTime;
+
+
+			BMI->rawDatas.isAccelUpdated = 0;
+			isTimeUpdated = 1;
 		}
-		else{
-			Temp_int11 = Temp_uint11;
-			BMI->temp = (float)Temp_int11 * 0.125 + 23.0;
-		}
-		uint32_t sensorTime = (BMI->rawDatas.accel[8] << 16) | (BMI->rawDatas.accel[7] << 8) | BMI->rawDatas.accel[6];
 
-		BMI->currentTime= (float)sensorTime * 39.0625 / 1000000.0;
+		if(BMI->rawDatas.isGyroUpdated && isTimeUpdated)
+		{
+			if(isStarded){
+				ret_val = HAL_I2C_Mem_Read(bmi_I2C, GYRO_I2C_ADD, GYRO_RATE_X_LSB, I2C_MEMADD_SIZE_8BIT, BMI->rawDatas.gyro, 6, 10);
+				if(ret_val)
+					return;
+				int16_t gyro_z_16 = (BMI->rawDatas.gyro[5] << 8) | BMI->rawDatas.gyro[4];
+				int16_t gyro_y_16 = (BMI->rawDatas.gyro[3] << 8) | BMI->rawDatas.gyro[2];
+				int16_t gyro_x_16 = (BMI->rawDatas.gyro[1] << 8) | BMI->rawDatas.gyro[0];
 
-		int16_t acc_z_16 = (BMI->rawDatas.accel[5] << 8) | BMI->rawDatas.accel[4];
-		int16_t acc_y_16 = (BMI->rawDatas.accel[3] << 8) | BMI->rawDatas.accel[2];
-		int16_t acc_x_16 = (BMI->rawDatas.accel[1] << 8) | BMI->rawDatas.accel[0];
+				/*
+				BMI->delta_angle_z = (((float)gyro_z_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_Z_OFFSET) * BMI->deltaTime;
+				BMI->delta_angle_y = (((float)gyro_y_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_Y_OFFSET) * BMI->deltaTime;
+				BMI->delta_angle_x = (((float)gyro_x_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_X_OFFSET) * BMI->deltaTime;
+				 */
+				BMI->gyro_z = (((double)gyro_z_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - saved_datas->offset_vals[0]);
+				BMI->gyro_y = (((double)gyro_y_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - saved_datas->offset_vals[1]);
+				BMI->gyro_x = (((double)gyro_x_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - saved_datas->offset_vals[2]);
 
-		BMI->acc_z = (float)acc_z_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_Z_OFFSET;
-		BMI->acc_y = (float)acc_y_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_Y_OFFSET;
-		BMI->acc_x = (float)acc_x_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_X_OFFSET;
-
-		//BMI->vel_z = ((float)acc_z_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_Z_OFFSET - 1000.0) * BMI->deltaTime;
-		//BMI->vel_y = ((float)acc_y_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_Y_OFFSET) * BMI->deltaTime;
-		//BMI->vel_x = ((float)acc_x_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->deviceConfig.acc_range + 1)) - ACCEL_X_OFFSET) * BMI->deltaTime;
-
-		BMI->deltaTime = BMI->currentTime - BMI->lastTime < 0 ? 0.0 : BMI->currentTime - BMI->lastTime;
-		BMI->lastTime = BMI->currentTime;
-
-		BMI->rawDatas.isAccelUpdated = 0;
-		isTimeUpdated = 1;
-		UNUSED(retVal);
-	}
-
-	if(BMI->rawDatas.isGyroUpdated && isTimeUpdated)
-	{
-		if(isStarded){
-			HAL_I2C_Mem_Read(bmi_I2C, GYRO_I2C_ADD, GYRO_RATE_X_LSB, I2C_MEMADD_SIZE_8BIT, BMI->rawDatas.gyro, 6, 20);
-			int16_t gyro_z_16 = (BMI->rawDatas.gyro[5] << 8) | BMI->rawDatas.gyro[4];
-			int16_t gyro_y_16 = (BMI->rawDatas.gyro[3] << 8) | BMI->rawDatas.gyro[2];
-			int16_t gyro_x_16 = (BMI->rawDatas.gyro[1] << 8) | BMI->rawDatas.gyro[0];
-
-			/*
-			BMI->delta_angle_z = (((float)gyro_z_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_Z_OFFSET) * BMI->deltaTime;
-			BMI->delta_angle_y = (((float)gyro_y_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_Y_OFFSET) * BMI->deltaTime;
-			BMI->delta_angle_x = (((float)gyro_x_16 / 32767.0) * (float)(2000 >> BMI->deviceConfig.gyro_range) - GYRO_X_OFFSET) * BMI->deltaTime;
-			 */
-			BMI->gyro_z = (((double)gyro_z_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - offset_vals_d[0]);
-			BMI->gyro_y = (((double)gyro_y_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - offset_vals_d[1]);
-			BMI->gyro_x = (((double)gyro_x_16 / 32767.0) * (double)(2000 >> BMI->deviceConfig.gyro_range) - offset_vals_d[2]);
-
-			BMI->gyro_z_angle += (BMI->gyro_z) * BMI->deltaTime;
-			BMI->gyro_y_angle += (BMI->gyro_y) * BMI->deltaTime;
-			BMI->gyro_x_angle += (BMI->gyro_x) * BMI->deltaTime;
+				BMI->gyro_z_angle += (BMI->gyro_z) * BMI->deltaTime;
+				BMI->gyro_y_angle += (BMI->gyro_y) * BMI->deltaTime;
+				BMI->gyro_x_angle += (BMI->gyro_x) * BMI->deltaTime;
 
 
-			//update_quaternion(q, BMI->gyro_x, BMI->gyro_y, BMI->gyro_z, BMI->deltaTime);
-			//calculateQuaternion(q, BMI->gyro_x, BMI->gyro_y, BMI->gyro_z, BMI->deltaTime, vector);
+				//update_quaternion(q, BMI->gyro_x, BMI->gyro_y, BMI->gyro_z, BMI->deltaTime);
+				//calculateQuaternion(q, BMI->gyro_x, BMI->gyro_y, BMI->gyro_z, BMI->deltaTime, vector);
 
-			updateQuaternion(-BMI->gyro_z * M_PI / 180.0, BMI->gyro_x * M_PI / 180.0, -BMI->gyro_y * M_PI / 180.0, BMI->deltaTime);
-			quaternionToEuler();
+				updateQuaternion(-BMI->gyro_z * M_PI / 180.0, BMI->gyro_x * M_PI / 180.0, -BMI->gyro_y * M_PI / 180.0, BMI->deltaTime);
+				quaternionToEuler();
 
+				is_gyro_offset = 1;
+			}
 			BMI->rawDatas.isGyroUpdated = 0;
 			isTimeUpdated = 0;
-			is_gyro_offset = 1;
-		}else
-		{
-			BMI->lastTime = BMI->currentTime;
-			isStarded = 1;
 		}
-	}
+
+
 }
 
 
@@ -328,9 +348,9 @@ void getOffset()
 					 g[0][0] /= 1000.0;
 					 g[0][1] /= 1000.0;
 					 g[0][2] /= 1000.0;
-					 offset_vals_d[0] = g[0][0];
-					 offset_vals_d[1] = g[0][1];
-					 offset_vals_d[2] = g[0][2];
+					 saved_datas->offset_vals[0] = g[0][0];
+					 saved_datas->offset_vals[1] = g[0][1];
+					 saved_datas->offset_vals[2] = g[0][2];
 					 quaternionSet_zero();
 					 break;
 					 //Error_Handler();

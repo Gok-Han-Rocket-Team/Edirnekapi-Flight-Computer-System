@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <main.h>
 
+
 #define BME280_ADD			(0x76 << 1)
 #define BME280_PARAM1_START	0x88		//First parameters starting address (total 25 bytes).
 #define BME280_PARAM2_START	0xE1		//Second parameters starting address (total 7 bytes).
@@ -72,22 +73,29 @@ typedef struct BME_parameters{
 	int8_t		dig_H6;
 }BME_parameters_t;
 
+typedef struct config_bme_s_t
+{
+	uint8_t		bme280_mode;
+	uint8_t		bme280_output_speed;
+	uint8_t		bme280_filter;
+}config_bme_s;
+
 typedef struct BME280_struct
 {
-	volatile BME_parameters_t 	parameters;
+	volatile BME_parameters_t 	*parameters;
 	volatile BME_adc_values_t	adcVals;
+	volatile config_bme_s		device_config;
 	float temperature;
 	float pressure;
 	float humidity;
 	float height;
-	volatile float maxAltitude;
 	volatile float altitude;
-	volatile float baseAltitude;
 	float velocity;
 	uint8_t isUpdated;
 }BME_280_t;
 
-HAL_StatusTypeDef bme280_init(BME_280_t* BME, I2C_HandleTypeDef* I2C_bme, uint8_t mode, uint8_t OS, uint8_t filter);
+void bme280_init(BME_280_t* BME, I2C_HandleTypeDef* I2C_bme);
+void bme280_config();
 void bme280_update();
 float moving_average(float newVal);
 #endif

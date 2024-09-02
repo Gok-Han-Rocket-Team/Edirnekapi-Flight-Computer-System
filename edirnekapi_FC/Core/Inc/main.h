@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+//#include "bme280.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -43,6 +43,9 @@ typedef struct Power
 	float mWatt;
 	float mWatt_s;
 }power;
+
+
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -70,6 +73,10 @@ void deploy_p_2();
 #define CURRENT_SENS_GPIO_Port GPIOC
 #define P_1_MOS_Pin GPIO_PIN_3
 #define P_1_MOS_GPIO_Port GPIOC
+#define GPIO_0_Pin GPIO_PIN_0
+#define GPIO_0_GPIO_Port GPIOB
+#define GPIO_1_Pin GPIO_PIN_1
+#define GPIO_1_GPIO_Port GPIOB
 #define BUZZER_Pin GPIO_PIN_12
 #define BUZZER_GPIO_Port GPIOB
 #define LED_Pin GPIO_PIN_13
@@ -86,6 +93,8 @@ void deploy_p_2();
 #define INT_GYRO_Pin GPIO_PIN_4
 #define INT_GYRO_GPIO_Port GPIOB
 #define INT_GYRO_EXTI_IRQn EXTI4_IRQn
+#define LORA_AUX_Pin GPIO_PIN_9
+#define LORA_AUX_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 /* USER CODE END Private defines */
 

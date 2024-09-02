@@ -10,8 +10,11 @@
 #include <math.h>
 #include "main.h"
 #include <stdint.h>
+#include "reset_detect.h"
 
 extern UART_HandleTypeDef huart1;
+extern backup_sram_datas_s *saved_datas;
+extern int is_BME_ok;
 
 float currentTime_1 = 0.0;
 float currentTime_2 = 0.0;
@@ -78,7 +81,7 @@ void algorithm_1_update(BME_280_t* BME)
 	{
 	  isRising = 1;
 	  algorithm_1_start_time_u32 = HAL_GetTick();
-	  rocketStatus = rocketStatus < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : rocketStatus;
+	  saved_datas->r_status = saved_datas->r_status < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : saved_datas->r_status;
 	  ext_pin_open(&buzzer);
 	}
 
@@ -95,7 +98,7 @@ void algorithm_1_update(BME_280_t* BME)
 	if(fallingCounter == 1 && isRising == 1 && isFalling == 0 && BME->altitude > ARMING_ALTITUDE_1)
 	{
 	  isFalling = 1;
-	  rocketStatus = rocketStatus < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : rocketStatus;
+	  saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : saved_datas->r_status;
 	  deploy_p_1();
 	}
 
@@ -112,7 +115,7 @@ void algorithm_1_update(BME_280_t* BME)
 	}
 	if(second_p_counter_1 == 10)
 	{
-		rocketStatus = rocketStatus < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : rocketStatus;
+		saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : saved_datas->r_status;
 		is_second_p_OK_1 = 1;
 		deploy_p_2();
 	}
@@ -125,11 +128,11 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	if((sqrtf(sqr(BMI->acc_x) + sqr(BMI->acc_y) + sqr(BMI->acc_z)) > RISING_G_TRESHOLD) && isRising_2 == 0)
 	{
 		if(BME->altitude < 200.0 && BME->altitude > -200.0){
-			BME->baseAltitude = BME->altitude + BME->baseAltitude;
+			saved_datas->base_altitude = BME->altitude + saved_datas->base_altitude;
 		}
 
 		isRising_2 = 1;
-		rocketStatus = rocketStatus < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : rocketStatus;
+		saved_datas->r_status = saved_datas->r_status < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : saved_datas->r_status;
 		ext_pin_open(&buzzer);
 	}
 
@@ -141,7 +144,7 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	}
 	if(burnout_counter == 10)
 	{
-		rocketStatus = rocketStatus < STAT_MOTOR_BURNOUT ? STAT_MOTOR_BURNOUT : rocketStatus;
+		saved_datas->r_status = saved_datas->r_status < STAT_MOTOR_BURNOUT ? STAT_MOTOR_BURNOUT : saved_datas->r_status;
 		ext_pin_open(&buzzer);
 	}
 
@@ -149,25 +152,27 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	if(angle > ANGLE_THRESHOLD && isRising_2 == 1 && isFalling_2 == 0 && BME->altitude > ARMING_ALTITUDE_2)
 	{
 		isFalling_2 = 1;
-		rocketStatus = rocketStatus < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : rocketStatus;
+		saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : saved_datas->r_status;
 		deploy_p_1();
 	}
 
-	//Second Parachute
-	if(BME->altitude < SECOND_DEPLOY_ALTITUDE && isFalling_2 == 1 && is_secondP_OK == 0)
+	if(is_BME_ok == 1)
 	{
-		secondP_counter++;
+		//Second Parachute
+		if(BME->altitude < SECOND_DEPLOY_ALTITUDE && isFalling_2 == 1 && is_secondP_OK == 0)
+		{
+			secondP_counter++;
+		}
+		else{
+			secondP_counter = 0;
+		}
+		if(secondP_counter == 10)
+		{
+			saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : saved_datas->r_status;
+			is_secondP_OK = 1;
+			deploy_p_2();
+		}
 	}
-	else{
-		secondP_counter = 0;
-	}
-	if(secondP_counter == 10)
-	{
-		rocketStatus = rocketStatus < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : rocketStatus;
-		is_secondP_OK = 1;
-		deploy_p_2();
-	}
-
 	//Touchdown Detection
 	static uint8_t is_TD = 0;
 	if(sqrt(sqr(BMI->gyro_x) + sqr(BMI->gyro_y) + sqr(BMI->gyro_z)) < 10.0 && isFalling_2 == 1 && is_secondP_OK == 1 && is_TD == 0)
@@ -180,7 +185,7 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 	if(TD_counter > 1000)
 	{
 		is_TD = 1;
-		rocketStatus = rocketStatus < STAT_TOUCH_DOWN ? STAT_TOUCH_DOWN : rocketStatus;
+		saved_datas->r_status = saved_datas->r_status < STAT_TOUCH_DOWN ? STAT_TOUCH_DOWN : saved_datas->r_status;
 		ext_pin_open(&buzzer);
 	}
 }

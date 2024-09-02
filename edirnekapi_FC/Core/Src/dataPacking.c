@@ -1,6 +1,15 @@
 #include "dataPacking.h"
 #include "main.h"
 #include "queternion.h"
+#include "reset_detect.h"
+#include "lora.h"
+#include "strain_gauge.h"
+
+#ifndef ROCKET_CARD
+extern hx711_t loadcell;
+#endif
+
+extern backup_sram_datas_s *saved_datas;
 
 union DataPack veriler;
 
@@ -54,7 +63,11 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 	veriler.dataYapi.nem = (uint8_t)(int)(bme->humidity);
 
 	veriler.dataYapi.yukseklik_p = bme->altitude;
-	veriler.dataYapi.maxAltitude = (int16_t)(int)bme->maxAltitude;
+#ifdef ROCKET_CARD
+	veriler.dataYapi.maxAltitude = (int16_t)(int)saved_datas->max_altitude;
+#else
+	veriler.dataYapi.maxAltitude = (int16_t)(int)((float)strain_gage_get_vals(&loadcell) / 1000.0);
+#endif
 	veriler.dataYapi.yukseklik_gps = gps->altitudeInMeter;
 
 	veriler.dataYapi.lat = gps->lat;
@@ -82,11 +95,13 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 
 #ifdef PRINT_DECODED
 	if(guc->voltaj > LOW_BAT){
+		lora_activate();
 		sendRF();
 		sendPC();
 	}
 	else{
 		sendPC();
+		lora_deactivate();
 	}
 #endif
 #ifndef PRINT_DECODED
@@ -98,9 +113,9 @@ void printDatas()
 {
 	static uint8_t bufferPrint[300];
 	  sprintf((char*)bufferPrint, "\r\n\n\n\r%X min: %d  sec: %d  stat: %d  volt: %.2f  mWatt/s: %d  temp: %.1f\r\n"
-			  "hum: %d  alt: %.1f maxAlt: %d altGps: %.1f  lat: %f  lon: %f\r\n"
-			  "angle: %.1f  pitch:%d  roll:%d  yaw:%d | real pitch: %.1f  roll: %.1f  yaw: %.1f\r\n"
-			  "sat:%d  velocity:%.1f  ivmeX:%.3f  ivmeY:%.3f  ivmeZ:%.3f   CRC: %d", veriler.dataYapi.basla,
+			  "hum:%d  alt:%.1f maxAlt:%d altGps: %.1f  lat: %f  lon: %f\r\n"
+			  "angle:%.1f  pitch:%d  roll:%d  yaw:%d | real pitch: %.1f  roll: %.1f  yaw: %.1f\r\n"
+			  "sat:%d  velocity:%.1f  ivmeX:%.3f  ivmeY:%.3f  ivmeZ:%.3f CRC:%d", veriler.dataYapi.basla,
 			  (veriler.dataYapi.zaman >> 2), ((veriler.dataYapi.zaman & 3) << 4) | (veriler.dataYapi.durum >> 4),
 			  veriler.dataYapi.durum & 0x0F, ((float)veriler.dataYapi.voltaj) / 100 ,
 			  veriler.dataYapi.akim , (float)veriler.dataYapi.sicaklik / 3, veriler.dataYapi.nem,

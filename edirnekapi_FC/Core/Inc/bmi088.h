@@ -11,20 +11,16 @@
 #include "main.h"
 #include <stdio.h>
 #include <string.h>
+#include "configuration.h"
 
 extern float roll, pitch, yaw;
 
-#define CARD_1
-//#define CARD_2
-
 //Offset Values
-#ifdef CARD_1
+#ifdef ROCKET_CARD
 #define ACCEL_Z_OFFSET 			(double)4.0
 #define ACCEL_Y_OFFSET 			(double)-15.0
 #define ACCEL_X_OFFSET 			(double)-4.0
-#endif
-
-#ifdef CARD_2
+#else
 #define ACCEL_Z_OFFSET 			(double)0.0
 #define ACCEL_Y_OFFSET 			(double)0.0
 #define ACCEL_X_OFFSET 			(double)0.0
@@ -103,6 +99,7 @@ extern float roll, pitch, yaw;
 
 #define ACC_PWR_SAVE_OFF		0x03
 #define ACC_PWR_SAVE_ACTIVE		0x00
+#define ACC_PWR_SAVE_ULTRA		0x01
 
 #define ACC_ENABLE				0x04
 #define ACC_DISABLE				0x00
@@ -221,6 +218,7 @@ typedef struct bmi088_struct
 }bmi088_struct_t;
 
 void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_);
+void bmi088_config();
 void bmi088_update();
 void bmi088_getGyroDatas_INT();
 void bmi088_getAccelDatas_INT();
