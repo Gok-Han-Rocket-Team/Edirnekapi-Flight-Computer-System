@@ -182,7 +182,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_NVIC_SetPriority(EXTI3_IRQn, 2, 0);
   HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
-
+  lora_deactivate();
   HAL_PWR_EnableBkUpAccess();
   RCC->AHB1ENR |= RCC_AHB1ENR_BKPSRAMEN;
   HAL_PWR_EnableBkUpReg();
@@ -222,6 +222,7 @@ int main(void)
 	  }
 
 	  loraBegin();
+	  lora_deactivate();
 	  HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,57600*2C\r\n", 19, 100);
 	  //HAL_UART_Transmit(&huart2, "$PMTK251,9600*17\r\n", 18, 100);				// 9600 bps
 	  if(is_BMI_ok)
@@ -846,9 +847,6 @@ void loraBegin()
     lora_configure(&e22_lora);
 
     HAL_Delay(100);
-
-	HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, RESET);
-	HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, RESET);
 }
 
 void measurePower(power *guc_)
