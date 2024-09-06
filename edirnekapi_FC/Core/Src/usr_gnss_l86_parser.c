@@ -198,7 +198,7 @@ _io void getGGA(void)
     if (g_openFixedDataTransmition)
     {
         MsgIndex = 0;
-        strcpy(m_gpsTransmitBuf, (char *)(m_rxData));
+//        strcpy(m_gpsTransmitBuf, (char *)(m_rxData));
         ptr = strstr(m_gpsTransmitBuf, "GPGGA");
 
         if (*ptr == 'G')

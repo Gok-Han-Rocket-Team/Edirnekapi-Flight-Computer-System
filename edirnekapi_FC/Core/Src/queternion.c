@@ -59,10 +59,8 @@ float quaternionToTheta(){
 	return theta;
 }
 
-
-
 // İvmeölçerden başlangıç quaternioni hesaplama
-static void getInitialQuaternion() {
+void getInitialQuaternion() {
 
     double norm = sqrt(BMI_sensor.acc_z * BMI_sensor.acc_z + BMI_sensor.acc_x * BMI_sensor.acc_x + BMI_sensor.acc_y * BMI_sensor.acc_y);
     double accel_temp[3];
@@ -91,9 +89,11 @@ static void getInitialQuaternion() {
     saved_datas->q[3] = 0.0f;
 }
 
-
-
 void quaternionSet_zero(void)
 {
-	getInitialQuaternion();
+	saved_datas->q[0] = 0.0;
+	saved_datas->q[1] = 0.0;
+	saved_datas->q[2] = 0.0;
+	saved_datas->q[3] = 1.0f;
 }
+

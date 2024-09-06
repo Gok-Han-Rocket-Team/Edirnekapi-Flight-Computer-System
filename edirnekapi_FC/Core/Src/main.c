@@ -110,6 +110,7 @@ int counterGy = 0;
 int configBmi = 0;
 int is_BME_ok = 0;
 int is_BMI_ok = 0;
+int is_quaternion_zeroed = 0;
 
 uint32_t buzzLastTime = 0;
 
@@ -194,9 +195,7 @@ int main(void)
   bme280_begin();
   bmi088_begin();
 
-#ifndef	ROCKET_CARD
-  straing_gage_gpio_init(&loadcell, GPIO_0_GPIO_Port, GPIO_0_Pin, GPIO_1_GPIO_Port, GPIO_1_Pin);
-#endif
+
 
   if(measure_abs_time(sTime, sDate) > 1)
   {
@@ -228,8 +227,13 @@ int main(void)
 	  if(is_BMI_ok)
 		  getOffset();
 
+#ifndef	ROCKET_CARD
+  straing_gage_gpio_init(&loadcell, GPIO_0_GPIO_Port, GPIO_0_Pin, GPIO_1_GPIO_Port, GPIO_1_Pin);
+#endif
 	  HAL_Delay(10);
   }
+
+
 
   HAL_UART_DeInit(&huart4);
   HAL_UART_DeInit(&huart2);
@@ -271,7 +275,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -287,8 +290,6 @@ int main(void)
 	  ext_pin_update(&led);
 	  ext_pin_update(&buzzer);
 
-
-
 #if defined(ALGORITHM_1)
 	  if(is_BME_ok)
 		  algorithm_1_update(&BME280_sensor);
@@ -302,6 +303,11 @@ int main(void)
 		  if(saved_datas->r_status == STAT_FLIGHT_STARTED){lora_hz = 5;}
 		  else if(saved_datas->r_status > STAT_MOTOR_BURNOUT){lora_hz = 1;}
 
+		  if(BME280_sensor.altitude > 4000 && is_quaternion_zeroed == 0)
+		  {
+			  quaternionSet_zero();
+			  is_quaternion_zeroed = 1;
+		  }
 	  	  currentTime = ((float)HAL_GetTick()) / 1000.0;
 
 	  	 //Set initial quaternion every minute.
@@ -309,7 +315,7 @@ int main(void)
 		 {
 			 if(saved_datas->r_status == STAT_ROCKET_READY && sqrt(pow(BMI_sensor.gyro_x, 2) + pow(BMI_sensor.gyro_y, 2) + pow(BMI_sensor.gyro_z, 2)) < 5.0 && is_BMI_ok == 1)
 			 {
-				 quaternionSet_zero();
+				 getInitialQuaternion();
 				 ext_pin_open_duration(&buzzer, 500);
 			 }
 			 lastTime2 = currentTime;
@@ -750,7 +756,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, P_1_MOS_Pin|P_2_MOS_Pin|LORA_M0_Pin|LORA_M1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_0_Pin|GPIO_1_Pin|BUZZER_Pin|LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_0_Pin|GPIO_1_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, BUZZER_Pin|LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : P_1_MOS_Pin P_2_MOS_Pin LORA_M0_Pin LORA_M1_Pin */
   GPIO_InitStruct.Pin = P_1_MOS_Pin|P_2_MOS_Pin|LORA_M0_Pin|LORA_M1_Pin;
@@ -759,8 +768,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : GPIO_0_Pin GPIO_1_Pin BUZZER_Pin LED_Pin */
-  GPIO_InitStruct.Pin = GPIO_0_Pin|GPIO_1_Pin|BUZZER_Pin|LED_Pin;
+  /*Configure GPIO pin : GPIO_0_Pin */
+  GPIO_InitStruct.Pin = GPIO_0_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIO_0_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : GPIO_1_Pin BUZZER_Pin LED_Pin */
+  GPIO_InitStruct.Pin = GPIO_1_Pin|BUZZER_Pin|LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -779,7 +795,11 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(LORA_AUX_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 2, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
 }
 

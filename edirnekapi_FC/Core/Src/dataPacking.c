@@ -12,6 +12,7 @@ extern hx711_t loadcell;
 extern backup_sram_datas_s *saved_datas;
 
 union DataPack veriler;
+uint8_t bufferPrint[400];
 
 static uint8_t calculateCRC()
 {
@@ -111,7 +112,7 @@ void packDatas(bmi088_struct_t *bmi, BME_280_t *bme, S_GPS_L86_DATA *gps, power 
 
 void printDatas()
 {
-	static uint8_t bufferPrint[300];
+
 	  sprintf((char*)bufferPrint, "\r\n\n\n\r%X min: %d  sec: %d  stat: %d  volt: %.2f  mWatt/s: %d  temp: %.1f\r\n"
 			  "hum:%d  alt:%.1f maxAlt:%d altGps: %.1f  lat: %f  lon: %f\r\n"
 			  "angle:%.1f  pitch:%d  roll:%d  yaw:%d | real pitch: %.1f  roll: %.1f  yaw: %.1f\r\n"

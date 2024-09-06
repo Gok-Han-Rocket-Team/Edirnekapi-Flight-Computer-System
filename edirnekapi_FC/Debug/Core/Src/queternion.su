@@ -1,5 +1,5 @@
 ../Core/Src/queternion.c:15:6:updateQuaternion	48	static
 ../Core/Src/queternion.c:36:6:quaternionToEuler	16	static
 ../Core/Src/queternion.c:43:7:quaternionToTheta	48	static
-../Core/Src/queternion.c:65:13:getInitialQuaternion	88	static
-../Core/Src/queternion.c:96:6:quaternionSet_zero	8	static
+../Core/Src/queternion.c:63:6:getInitialQuaternion	88	static
+../Core/Src/queternion.c:92:6:quaternionSet_zero	4	static

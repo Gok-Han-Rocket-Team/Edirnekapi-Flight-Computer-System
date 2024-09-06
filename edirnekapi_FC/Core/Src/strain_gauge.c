@@ -7,6 +7,7 @@
 #include "main.h"
 #include "strain_gauge.h"
 
+extern UART_HandleTypeDef huart1;
 
 static void strain_gage_delay_us(void)
 {
@@ -20,10 +21,12 @@ static void strain_gage_delay_us(void)
 
 void straing_gage_gpio_init(hx711_t *hx711, GPIO_TypeDef *clk_gpio, uint16_t clk_pin, GPIO_TypeDef *dat_gpio, uint16_t dat_pin)
 {
+	uint8_t buf[50];
   hx711->clk_gpio = clk_gpio;
   hx711->clk_pin = clk_pin;
   hx711->dat_gpio = dat_gpio;
   hx711->dat_pin = dat_pin;
+
   HAL_GPIO_DeInit(clk_gpio, clk_pin);
   HAL_GPIO_DeInit(dat_gpio, dat_pin);
 
@@ -43,13 +46,14 @@ void straing_gage_gpio_init(hx711_t *hx711, GPIO_TypeDef *clk_gpio, uint16_t clk
   hx711_delay(10);
   int counter = 0;
   int32_t offset = 0;
-  for(int i = 0; i < 10; i++)
+  for(int i = 0; i < 20; i++)
   {
 	  int32_t value = strain_gage_get_vals(hx711);
 	  if(value != 0)
 	  {
 		  offset += value;
 		  counter++;
+
 	  }
 	  hx711_delay(10);
   }

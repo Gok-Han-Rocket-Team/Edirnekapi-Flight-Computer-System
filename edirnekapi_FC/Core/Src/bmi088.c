@@ -351,7 +351,7 @@ void getOffset()
 					 saved_datas->offset_vals[0] = g[0][0];
 					 saved_datas->offset_vals[1] = g[0][1];
 					 saved_datas->offset_vals[2] = g[0][2];
-					 quaternionSet_zero();
+					 getInitialQuaternion();
 					 break;
 					 //Error_Handler();
 				 }

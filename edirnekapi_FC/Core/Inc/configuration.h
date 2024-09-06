@@ -11,8 +11,7 @@
 
 //************************************   Card Choice   ************************************
 //Comment if payload is being coded.
-#define ROCKET_CARD
-
+//#define ROCKET_CARD
 
 //************************************   Frequency Choice   ************************************
 //freq = freq_val + 410.125

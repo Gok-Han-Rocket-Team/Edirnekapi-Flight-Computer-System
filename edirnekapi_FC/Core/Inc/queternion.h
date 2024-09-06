@@ -15,5 +15,6 @@ extern bmi088_struct_t BMI_sensor;
 void updateQuaternion(float gx, float gy, float gz, float dt);
 void quaternionToEuler(void);
 void quaternionSet_zero(void);
+void getInitialQuaternion(void);
 float quaternionToTheta(void);
 #endif
