@@ -11,7 +11,7 @@
 
 //************************************   Card Choice   ************************************
 //Comment if payload is being coded.
-//#define ROCKET_CARD
+#define ROCKET_CARD
 //#define ROCKET_IGNITER_TEST
 
 //************************************   Frequency Choice   ************************************
