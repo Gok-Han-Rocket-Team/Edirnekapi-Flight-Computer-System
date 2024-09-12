@@ -32,6 +32,6 @@ enum flightStates{
 typedef uint8_t algorithmStatus;
 
 void algorithm_1_update(BME_280_t* BME);
-void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle);
+void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI);
 
 #endif /* INC_ALGORITHMS_H_ */

@@ -29,7 +29,7 @@ static void sendRF()
 	{
 		//HAL_GPIO_WritePin(LORA_M0_GPIO_Port, LORA_M0_Pin, SET);
 		//HAL_GPIO_WritePin(LORA_M1_GPIO_Port, LORA_M1_Pin, SET);
-		HAL_UART_Transmit_DMA(&huart4, veriler.arr, sizeof(veriler.dataYapi));
+		HAL_UART_Transmit_DMA(&huart4, veriler.arr, sizeof(veriler.arr));
 		//HAL_UART_Transmit_DMA(&huart4, "hello\n\r", 7);
 	}
 }

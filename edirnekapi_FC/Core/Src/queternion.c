@@ -91,9 +91,9 @@ void getInitialQuaternion() {
 
 void quaternionSet_zero(void)
 {
-	saved_datas->q[0] = 0.0;
+	saved_datas->q[0] = 1.0;
 	saved_datas->q[1] = 0.0;
 	saved_datas->q[2] = 0.0;
-	saved_datas->q[3] = 1.0f;
+	saved_datas->q[3] = 0.0;
 }
 

@@ -10,6 +10,7 @@ C_SRCS += \
 ../Core/Src/bmi088.c \
 ../Core/Src/dataPacking.c \
 ../Core/Src/externalPins.c \
+../Core/Src/fatfs_sd.c \
 ../Core/Src/lora.c \
 ../Core/Src/main.c \
 ../Core/Src/queternion.c \
@@ -20,6 +21,7 @@ C_SRCS += \
 ../Core/Src/syscalls.c \
 ../Core/Src/sysmem.c \
 ../Core/Src/system_stm32f4xx.c \
+../Core/Src/usr_fat_sd.c \
 ../Core/Src/usr_gnss_l86_parser.c 
 
 OBJS += \
@@ -28,6 +30,7 @@ OBJS += \
 ./Core/Src/bmi088.o \
 ./Core/Src/dataPacking.o \
 ./Core/Src/externalPins.o \
+./Core/Src/fatfs_sd.o \
 ./Core/Src/lora.o \
 ./Core/Src/main.o \
 ./Core/Src/queternion.o \
@@ -38,6 +41,7 @@ OBJS += \
 ./Core/Src/syscalls.o \
 ./Core/Src/sysmem.o \
 ./Core/Src/system_stm32f4xx.o \
+./Core/Src/usr_fat_sd.o \
 ./Core/Src/usr_gnss_l86_parser.o 
 
 C_DEPS += \
@@ -46,6 +50,7 @@ C_DEPS += \
 ./Core/Src/bmi088.d \
 ./Core/Src/dataPacking.d \
 ./Core/Src/externalPins.d \
+./Core/Src/fatfs_sd.d \
 ./Core/Src/lora.d \
 ./Core/Src/main.d \
 ./Core/Src/queternion.d \
@@ -56,17 +61,18 @@ C_DEPS += \
 ./Core/Src/syscalls.d \
 ./Core/Src/sysmem.d \
 ./Core/Src/system_stm32f4xx.d \
+./Core/Src/usr_fat_sd.d \
 ./Core/Src/usr_gnss_l86_parser.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
 Core/Src/%.o Core/Src/%.su: ../Core/Src/%.c Core/Src/subdir.mk
-	arm-none-eabi-gcc "$<" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "$@"
+	arm-none-eabi-gcc "$<" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../Middlewares/Third_Party/FatFs/src -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "$@"
 
 clean: clean-Core-2f-Src
 
 clean-Core-2f-Src:
-	-$(RM) ./Core/Src/algorithms.d ./Core/Src/algorithms.o ./Core/Src/algorithms.su ./Core/Src/bme280.d ./Core/Src/bme280.o ./Core/Src/bme280.su ./Core/Src/bmi088.d ./Core/Src/bmi088.o ./Core/Src/bmi088.su ./Core/Src/dataPacking.d ./Core/Src/dataPacking.o ./Core/Src/dataPacking.su ./Core/Src/externalPins.d ./Core/Src/externalPins.o ./Core/Src/externalPins.su ./Core/Src/lora.d ./Core/Src/lora.o ./Core/Src/lora.su ./Core/Src/main.d ./Core/Src/main.o ./Core/Src/main.su ./Core/Src/queternion.d ./Core/Src/queternion.o ./Core/Src/queternion.su ./Core/Src/reset_detect.d ./Core/Src/reset_detect.o ./Core/Src/reset_detect.su ./Core/Src/stm32f4xx_hal_msp.d ./Core/Src/stm32f4xx_hal_msp.o ./Core/Src/stm32f4xx_hal_msp.su ./Core/Src/stm32f4xx_it.d ./Core/Src/stm32f4xx_it.o ./Core/Src/stm32f4xx_it.su ./Core/Src/strain_gauge.d ./Core/Src/strain_gauge.o ./Core/Src/strain_gauge.su ./Core/Src/syscalls.d ./Core/Src/syscalls.o ./Core/Src/syscalls.su ./Core/Src/sysmem.d ./Core/Src/sysmem.o ./Core/Src/sysmem.su ./Core/Src/system_stm32f4xx.d ./Core/Src/system_stm32f4xx.o ./Core/Src/system_stm32f4xx.su ./Core/Src/usr_gnss_l86_parser.d ./Core/Src/usr_gnss_l86_parser.o ./Core/Src/usr_gnss_l86_parser.su
+	-$(RM) ./Core/Src/algorithms.d ./Core/Src/algorithms.o ./Core/Src/algorithms.su ./Core/Src/bme280.d ./Core/Src/bme280.o ./Core/Src/bme280.su ./Core/Src/bmi088.d ./Core/Src/bmi088.o ./Core/Src/bmi088.su ./Core/Src/dataPacking.d ./Core/Src/dataPacking.o ./Core/Src/dataPacking.su ./Core/Src/externalPins.d ./Core/Src/externalPins.o ./Core/Src/externalPins.su ./Core/Src/fatfs_sd.d ./Core/Src/fatfs_sd.o ./Core/Src/fatfs_sd.su ./Core/Src/lora.d ./Core/Src/lora.o ./Core/Src/lora.su ./Core/Src/main.d ./Core/Src/main.o ./Core/Src/main.su ./Core/Src/queternion.d ./Core/Src/queternion.o ./Core/Src/queternion.su ./Core/Src/reset_detect.d ./Core/Src/reset_detect.o ./Core/Src/reset_detect.su ./Core/Src/stm32f4xx_hal_msp.d ./Core/Src/stm32f4xx_hal_msp.o ./Core/Src/stm32f4xx_hal_msp.su ./Core/Src/stm32f4xx_it.d ./Core/Src/stm32f4xx_it.o ./Core/Src/stm32f4xx_it.su ./Core/Src/strain_gauge.d ./Core/Src/strain_gauge.o ./Core/Src/strain_gauge.su ./Core/Src/syscalls.d ./Core/Src/syscalls.o ./Core/Src/syscalls.su ./Core/Src/sysmem.d ./Core/Src/sysmem.o ./Core/Src/sysmem.su ./Core/Src/system_stm32f4xx.d ./Core/Src/system_stm32f4xx.o ./Core/Src/system_stm32f4xx.su ./Core/Src/usr_fat_sd.d ./Core/Src/usr_fat_sd.o ./Core/Src/usr_fat_sd.su ./Core/Src/usr_gnss_l86_parser.d ./Core/Src/usr_gnss_l86_parser.o ./Core/Src/usr_gnss_l86_parser.su
 
 .PHONY: clean-Core-2f-Src
 

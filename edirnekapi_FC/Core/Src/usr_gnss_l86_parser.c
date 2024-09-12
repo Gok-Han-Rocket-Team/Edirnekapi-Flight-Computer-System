@@ -7,7 +7,7 @@
 
 #include "usr_gnss_l86_parser.h"
 #define DMA_READ_DEF_SIZE 650
-#define _buffer_size 1024
+#define _buffer_size 2000
 #define _max_message_size 90
 
 extern DMA_HandleTypeDef hdma_usart2_rx;
@@ -124,8 +124,7 @@ void Usr_GpsL86GetValues(S_GPS_L86_DATA *gpsData_)
 
 _io void getRmc(void)
 {
-	if (g_GnssRx_Flag)
-	    {
+
 	        MsgIndex = 0;
 	        strcpy(m_gpsTransmitBuf, (char *)(m_rxData));
 	        ptr = strstr(m_gpsTransmitBuf, "GNRMC");
@@ -140,8 +139,6 @@ _io void getRmc(void)
 	                if (*ptr == '\n' || MsgIndex > _max_message_size)
 	                {
 	                    MsgIndex = 0;
-	                    memset(m_gpsTransmitBuf, 0, sizeof(m_gpsTransmitBuf));
-	                    memset(m_rxData, 0, sizeof(m_rxData));
 
 	                    for (int i = 0; i < 100; i++)
 	                    {
@@ -178,7 +175,7 @@ _io void getRmc(void)
 	        }
 	        g_GnssRx_Flag = false;
 
-	    }
+
 
 }
 
@@ -195,8 +192,7 @@ _io void formatLatLong(void)
 
 _io void getGGA(void)
 {
-    if (g_openFixedDataTransmition)
-    {
+
         MsgIndex = 0;
 //        strcpy(m_gpsTransmitBuf, (char *)(m_rxData));
         ptr = strstr(m_gpsTransmitBuf, "GPGGA");
@@ -228,5 +224,5 @@ _io void getGGA(void)
         }
         g_openFixedDataTransmition = false;
         //UsrGpsL86Init(&huart2);
-    }
+
 }

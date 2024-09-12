@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -35,6 +36,8 @@
 #include "configuration.h"
 #include "reset_detect.h"
 #include "strain_gauge.h"
+#include "fatfs_sd.h"
+#include "usr_fat_sd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,9 +63,12 @@ I2C_HandleTypeDef hi2c3;
 
 RTC_HandleTypeDef hrtc;
 
+SPI_HandleTypeDef hspi1;
+
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_uart4_tx;
 DMA_HandleTypeDef hdma_uart4_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
@@ -101,6 +107,8 @@ float loraLastTime = 0;
 float lora_hz = 1.0;
 float wattLastTime = 0;
 volatile float teta = 0;
+float sd_last_time_f = 0.0;
+float gnss_last_update_time = 0.0;
 
 extern int errorLine;
 
@@ -110,9 +118,9 @@ int counterGy = 0;
 int configBmi = 0;
 int is_BME_ok = 0;
 int is_BMI_ok = 0;
-int is_quaternion_zeroed = 0;
 
 uint32_t buzzLastTime = 0;
+uint32_t sd_log_counter = 0;
 
 uint8_t buf[250];
 
@@ -123,14 +131,16 @@ backup_sram_datas_s *saved_datas = (backup_sram_datas_s *)BKPSRAM_BASE;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_I2C1_Init(void);
+static void MX_DMA_Init(void);
 static void MX_I2C3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_DMA_Init(void);
+static void MX_I2C1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_UART4_Init(void);
 static void MX_RTC_Init(void);
+static void MX_SPI1_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void bme280_begin();
 static void bmi088_begin();
@@ -172,17 +182,24 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_I2C1_Init();
+  MX_DMA_Init();
   MX_I2C3_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
-  MX_DMA_Init();
+  MX_I2C1_Init();
   MX_ADC1_Init();
   MX_UART4_Init();
   MX_RTC_Init();
+  MX_SPI1_Init();
+  MX_FATFS_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_NVIC_SetPriority(EXTI3_IRQn, 2, 0);
   HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
+
+  usr_fatfsInitial();
+  sdInitials();
+
   lora_deactivate();
   HAL_PWR_EnableBkUpAccess();
   RCC->AHB1ENR |= RCC_AHB1ENR_BKPSRAMEN;
@@ -194,8 +211,6 @@ int main(void)
   HAL_Delay(5);
   bme280_begin();
   bmi088_begin();
-
-
 
   if(measure_abs_time(sTime, sDate) > 1)
   {
@@ -221,15 +236,19 @@ int main(void)
 	  }
 
 	  loraBegin();
-	  lora_deactivate();
+	  lora_activate();
 	  HAL_UART_Transmit(&huart2, (uint8_t*)"$PMTK251,57600*2C\r\n", 19, 100);
 	  //HAL_UART_Transmit(&huart2, "$PMTK251,9600*17\r\n", 18, 100);				// 9600 bps
-	  if(is_BMI_ok)
+	  if(is_BMI_ok){
 		  getOffset();
+	  }
+
+	  getInitialQuaternion();
 
 #ifndef	ROCKET_CARD
   straing_gage_gpio_init(&loadcell, GPIO_0_GPIO_Port, GPIO_0_Pin, GPIO_1_GPIO_Port, GPIO_1_Pin);
 #endif
+  sd_transmit("ok");
 	  HAL_Delay(10);
   }
 
@@ -269,6 +288,7 @@ int main(void)
   ext_pin_open_duration(&buzzer, 1000);
   BMI_sensor.rawDatas.isGyroUpdated = 0;
   BMI_sensor.rawDatas.isAccelUpdated = 0;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -295,21 +315,22 @@ int main(void)
 		  algorithm_1_update(&BME280_sensor);
 #endif
 #if defined(ALGORITHM_2)
-	  teta = quaternionToTheta();
+	  BMI_sensor.angle = quaternionToTheta();
 	  if(is_BMI_ok)
-		  algorithm_2_update(&BME280_sensor, &BMI_sensor, teta);
+		  algorithm_2_update(&BME280_sensor, &BMI_sensor);
 #endif
 
+
+
+#ifdef ROCKET_CARD
 		  if(saved_datas->r_status == STAT_FLIGHT_STARTED){lora_hz = 5;}
 		  else if(saved_datas->r_status > STAT_MOTOR_BURNOUT){lora_hz = 1;}
+#else
+		  if(saved_datas->r_status == STAT_FLIGHT_STARTED){lora_hz = 5;}
+		  else if(saved_datas->r_status == STAT_TOUCH_DOWN){lora_hz = 1;}
+#endif
 
-		  if(BME280_sensor.altitude > 4000 && is_quaternion_zeroed == 0)
-		  {
-			  quaternionSet_zero();
-			  is_quaternion_zeroed = 1;
-		  }
-	  	  currentTime = ((float)HAL_GetTick()) / 1000.0;
-
+		  currentTime = ((float)HAL_GetTick()) / 1000.0;
 	  	 //Set initial quaternion every minute.
 		 if(fabs(currentTime - lastTime2) > 60)
 		 {
@@ -321,11 +342,7 @@ int main(void)
 			 lastTime2 = currentTime;
 		 }
 
-		 //GNSS get location
-		 if(g_GnssRx_Flag)
-		 {
-			 Usr_GpsL86GetValues(&gnss_data);
-		 }
+
 
 		 //Lora timer;
 		 //loop_counter += 1;
@@ -339,6 +356,19 @@ int main(void)
 			 //loop_counter = 0;
 		 }
 
+		 if(fabs(currentTime - sd_last_time_f) > 0.1)
+		 {
+			 sdDataLogger(sd_log_counter, &BME280_sensor, &BMI_sensor, saved_datas, &gnss_data, &guc); // SD TRANSMIT
+			 sd_log_counter++;
+			 sd_last_time_f = currentTime;
+		 }
+
+		 //GNSS update function.
+		 if(fabs(currentTime - gnss_last_update_time) > 1.0)
+		 {
+			 Usr_GpsL86GetValues(&gnss_data);
+			 gnss_last_update_time = currentTime;
+		 }
 
 		 //some infos
 		 if(fabs(currentTime - lastTime) > 0.2)
@@ -368,6 +398,7 @@ int main(void)
 			 lastTime = currentTime;
 		 }
 
+#ifdef ROCKET_IGNITER_TEST
 		 //This block is used for manual deploy via telemetry for testing.
 		if(is_updated_uart4 == 1)
 		{
@@ -384,10 +415,7 @@ int main(void)
 		  }
 		  is_updated_uart4 = 0;
 		}
-
-
-
-
+#endif
 
   }
 
@@ -613,6 +641,44 @@ static void MX_RTC_Init(void)
 }
 
 /**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
   * @brief UART4 Initialization Function
   * @param None
   * @retval None
@@ -712,6 +778,39 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -756,10 +855,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, P_1_MOS_Pin|P_2_MOS_Pin|LORA_M0_Pin|LORA_M1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_0_Pin|GPIO_1_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, BUZZER_Pin|LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_0_Pin|GPIO_1_Pin|BUZZER_Pin|LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : P_1_MOS_Pin P_2_MOS_Pin LORA_M0_Pin LORA_M1_Pin */
   GPIO_InitStruct.Pin = P_1_MOS_Pin|P_2_MOS_Pin|LORA_M0_Pin|LORA_M1_Pin;
@@ -768,15 +867,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : GPIO_0_Pin */
-  GPIO_InitStruct.Pin = GPIO_0_Pin;
+  /*Configure GPIO pin : PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  HAL_GPIO_Init(GPIO_0_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : GPIO_1_Pin BUZZER_Pin LED_Pin */
-  GPIO_InitStruct.Pin = GPIO_1_Pin|BUZZER_Pin|LED_Pin;
+  /*Configure GPIO pins : GPIO_0_Pin GPIO_1_Pin BUZZER_Pin LED_Pin */
+  GPIO_InitStruct.Pin = GPIO_0_Pin|GPIO_1_Pin|BUZZER_Pin|LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -905,7 +1004,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     if(GPIO_Pin == INT_ACC_Pin)
     {
     	bmi088_getAccelDatas_INT();
-    	counterAcc++;
+    	//counterAcc++;
     }
 }
 
