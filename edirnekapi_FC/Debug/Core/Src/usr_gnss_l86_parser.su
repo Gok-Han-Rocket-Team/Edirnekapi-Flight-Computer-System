@@ -2,5 +2,5 @@
 ../Core/Src/usr_gnss_l86_parser.c:95:6:UsrGpsL86Init	16	static
 ../Core/Src/usr_gnss_l86_parser.c:102:6:Usr_GpsL86GetValues	16	static
 ../Core/Src/usr_gnss_l86_parser.c:125:10:getRmc	24	static
-../Core/Src/usr_gnss_l86_parser.c:185:10:formatLatLong	16	static
-../Core/Src/usr_gnss_l86_parser.c:196:10:getGGA	32	static
+../Core/Src/usr_gnss_l86_parser.c:182:10:formatLatLong	16	static
+../Core/Src/usr_gnss_l86_parser.c:193:10:getGGA	32	static

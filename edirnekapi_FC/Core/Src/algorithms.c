@@ -11,6 +11,7 @@
 #include "main.h"
 #include <stdint.h>
 #include "reset_detect.h"
+#include "queternion.h"
 
 extern UART_HandleTypeDef huart1;
 extern backup_sram_datas_s *saved_datas;
@@ -25,10 +26,12 @@ float lastAltitude_2 = 0.0;
 
 int risingCounter = 0;
 int fallingCounter = 0;
+static int is_quaternion_zeroed = 0;
 static int TD_counter = 0;
 static int secondP_counter = 0;
 
 uint32_t algorithm_1_start_time_u32 = 0;
+uint32_t algorithm_2_start_time_u32 = 0;
 
 uint8_t isFalling = 0;
 uint8_t isFalling_2 = 0;
@@ -122,7 +125,7 @@ void algorithm_1_update(BME_280_t* BME)
   }
 }
 
-void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
+void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI)
 {
 	//Rising detection
 	if((sqrtf(sqr(BMI->acc_x) + sqr(BMI->acc_y) + sqr(BMI->acc_z)) > RISING_G_TRESHOLD) && isRising_2 == 0)
@@ -132,13 +135,14 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 		}
 
 		isRising_2 = 1;
+		algorithm_2_start_time_u32 = HAL_GetTick();
 		saved_datas->r_status = saved_datas->r_status < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : saved_datas->r_status;
 		ext_pin_open(&buzzer);
 	}
 
 	//Burnout detection
 	static int burnout_counter = 0;
-	if(BMI->acc_y < BURNOUT_THRESHOLD && isRising_2 == 1 && burnout_counter < 101)
+	if(BMI->acc_y < BURNOUT_THRESHOLD && isRising_2 == 1 && burnout_counter < 12)
 	{
 		burnout_counter++;
 	}
@@ -148,8 +152,16 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI, float angle)
 		ext_pin_open(&buzzer);
 	}
 
+	//quaternion setting to zero
+	if((HAL_GetTick() - algorithm_2_start_time_u32) > QUATERNION_ZERO_TIME && is_quaternion_zeroed == 0 && isRising_2 == 1)
+	{
+	  quaternionSet_zero();
+	  is_quaternion_zeroed = 1;
+	  ext_pin_open(&buzzer);
+	}
+
 	//Falling detection || First parachute
-	if(angle > ANGLE_THRESHOLD && isRising_2 == 1 && isFalling_2 == 0 && BME->altitude > ARMING_ALTITUDE_2)
+	if(BMI->angle > ANGLE_THRESHOLD && isRising_2 == 1 && isFalling_2 == 0 && HAL_GetTick() - algorithm_2_start_time_u32 > ALGORITHM_2_LOCKOUT_TIME)
 	{
 		isFalling_2 = 1;
 		saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : saved_datas->r_status;

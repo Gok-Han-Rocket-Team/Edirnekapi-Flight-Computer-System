@@ -215,6 +215,7 @@ typedef struct bmi088_struct
 	float currentTime, lastTime;
 	float deltaTime;
 	float vel_x, vel_y, vel_z;
+	float angle;
 }bmi088_struct_t;
 
 void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_);

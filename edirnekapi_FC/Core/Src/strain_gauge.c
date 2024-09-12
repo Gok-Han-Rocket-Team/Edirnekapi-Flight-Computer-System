@@ -67,7 +67,7 @@ int32_t strain_gage_get_vals(hx711_t *hx711)
   while(HAL_GPIO_ReadPin(hx711->dat_gpio, hx711->dat_pin) == GPIO_PIN_SET)
   {
     hx711_delay(1);
-    if(HAL_GetTick() - startTime > 1)
+    if(HAL_GetTick() - startTime > 2)
       return 0;
   }
   for(int8_t i=0; i<24 ; i++)
