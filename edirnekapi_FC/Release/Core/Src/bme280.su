@@ -1,0 +1,4 @@
+../Core/Src/bme280.c:117:6:bme280_init	32	static
+../Core/Src/bme280.c:133:6:bme280_update	80	static
+../Core/Src/bme280.c:55:6:bme280_config	88	static
+../Core/Src/bme280.c:188:7:moving_average	0	static

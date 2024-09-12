@@ -1,0 +1,3 @@
+../Core/Src/strain_gauge.c:12:13:strain_gage_delay_us	0	static,ignoring_inline_asm
+../Core/Src/strain_gauge.c:63:9:strain_gage_get_vals	16	static
+../Core/Src/strain_gauge.c:22:6:straing_gage_gpio_init	64	static

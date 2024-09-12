@@ -1,0 +1,4 @@
+../Core/Src/usr_gnss_l86_parser.c:182:10:formatLatLong	0	static
+../Core/Src/usr_gnss_l86_parser.c:78:6:HAL_UART_RxCpltCallback	0	static
+../Core/Src/usr_gnss_l86_parser.c:95:6:UsrGpsL86Init	0	static
+../Core/Src/usr_gnss_l86_parser.c:102:6:Usr_GpsL86GetValues	48	static

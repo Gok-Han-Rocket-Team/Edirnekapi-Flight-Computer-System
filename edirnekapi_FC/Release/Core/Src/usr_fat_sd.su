@@ -1,0 +1,7 @@
+../Core/Src/usr_fat_sd.c:49:10:uart_Sd_Transmit	16	static
+../Core/Src/usr_fat_sd.c:119:13:usr_fatfsInitial	0	static
+../Core/Src/usr_fat_sd.c:123:13:sdInitials	16	static
+../Core/Src/usr_fat_sd.c:144:13:openFolder	0	static
+../Core/Src/usr_fat_sd.c:159:13:usrFatTest	0	static
+../Core/Src/usr_fat_sd.c:215:12:sd_transmit	264	static
+../Core/Src/usr_fat_sd.c:228:13:sdDataLogger	256	static

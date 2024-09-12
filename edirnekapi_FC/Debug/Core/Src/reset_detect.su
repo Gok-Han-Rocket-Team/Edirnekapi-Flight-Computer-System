@@ -1,0 +1,3 @@
+../Core/Src/reset_detect.c:11:6:save_status	16	static
+../Core/Src/reset_detect.c:17:6:save_time	16	static
+../Core/Src/reset_detect.c:26:10:measure_abs_time	16	static

@@ -1,0 +1,4 @@
+../Core/Src/externalPins.c:9:6:ext_pin_open	16	static
+../Core/Src/externalPins.c:16:6:ext_pin_open_duration	16	static
+../Core/Src/externalPins.c:23:6:ext_pin_close	16	static
+../Core/Src/externalPins.c:28:6:ext_pin_update	16	static
