@@ -25,7 +25,7 @@
 #define ALGORITHM_2							//Gyro, accelerometer, pressure sensor.
 
 //************************************   Algorithms Thresholds   ************************************
-#define SECOND_DEPLOY_ALTITUDE 		(float)570.0		//meters		570.0
+#define SECOND_DEPLOY_ALTITUDE 		(float)570.0			//meters		570.0
 
 #define ARMING_ALTITUDE_1			(float)1000.0		//m				1000
 #define RISING_VELOCITY_TRESHOLD	(float)30.0			//m/sn			30.0
@@ -39,7 +39,7 @@
 #define BURNOUT_THRESHOLD			(float)-2000.0		//mG			-2000.0
 #define ANGLE_THRESHOLD				(float)80.0			//degree		80.0
 
-
+//#define Q_SET_ZERO_ACTIVATE
 //************************************   Battery Settings   ************************************
 #define LOW_BAT						(float)7.0			//V
 

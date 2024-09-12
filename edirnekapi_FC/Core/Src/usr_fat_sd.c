@@ -212,13 +212,25 @@ PUBLIC void usrFatTest(void)
 
 #endif
 }
+
+int sd_csv_log_transmit(const char *str)
+{
+	fresult = f_open(&fil, "flightRecorder.csv", FA_OPEN_APPEND | FA_WRITE);
+	sprintf(_aBuf,"--;;; %s ;;;--\n",str);
+	fresult = f_printf(&fil, _aBuf);
+	fresult = f_close(&fil);
+	for (int i = 0; i < 2024; i++)
+		_aBuf[i] = 0;
+	return fresult;
+}
+
 PUBLIC int sd_transmit(const char *str)
 {
 	uint8_t _buffer[250];
 #ifdef ROCKET_CARD
-	sprintf((char*)_buffer, "Counter,Time,Pressure(mPa),Humidity(%%),Temperature(C),Altitude(m),Velocity(m/s),Acc_X,Acc_Y,Acc_Z,Gyro_X,Gyro_Y,Gyro_Z,Rocket_Status,Angle(degree),Q0,Q1,Q2,Q3,Max_altitude(m),Latitude,Longitude,Sat_count,GPS_altitude,Voltage,Current(mA),Power(mWs)\n");
+	sprintf((char*)_buffer, "Counter;Time;Pressure(mPa);Humidity(%%);Temperature(C);Altitude(m);Velocity(m/s);Acc_X;Acc_Y;Acc_Z;Gyro_X;Gyro_Y;Gyro_Z;Rocket_Status;Angle(degree);Q0;Q1;Q2;Q3;Max_altitude(m);Latitude;Longitude;Sat_count;GPS_altitude;Voltage;Current(mA);Power(mWs)\n");
 #else
-	sprintf((char*)_buffer, "Counter,Time,Pressure(mPa),Humidity(%%),Temperature(C),Altitude(m),Velocity(m/s),Acc_X,Acc_Y,Acc_Z,Gyro_X,Gyro_Y,Gyro_Z,Rocket_Status,Angle(degree),Q0,Q1,Q2,Q3,Strain,Latitude,Longitude,Sat_count,GPS_altitude,Voltage,Current(mA),Power(mWs)\n");
+	sprintf((char*)_buffer, "Counter;Time;Pressure(mPa);Humidity(%%);Temperature(C);Altitude(m);Velocity(m/s);Acc_X;Acc_Y;Acc_Z;Gyro_X;Gyro_Y;Gyro_Z;Rocket_Status;Angle(degree);Q0;Q1;Q2;Q3;Strain;Latitude;Longitude;Sat_count;GPS_altitude;Voltage;Current(mA);Power(mWs)\n");
 #endif
 	fresult = f_open(&fil, "flightRecorder.csv", FA_OPEN_APPEND | FA_WRITE); // open to write
 	fresult = f_printf(&fil, (char*)_buffer);
@@ -229,9 +241,9 @@ PUBLIC void sdDataLogger(uint32_t counter, BME_280_t *BME_Pack, bmi088_struct_t 
 {
 	fresult = f_open(&fil, "flightRecorder.csv", FA_OPEN_APPEND | FA_WRITE);
 #ifdef ROCKET_CARD
-	sprintf(_aBuf, "%lu,%.0f,%.3f,%.1f,%.1f,%.1f,%.1f,%f,%f,%f,%f,%f,%f,%d,%.2f,%f,%f,%f,%f,%.1f,%f,%f,%d,%.1f,%.2f,%.2f,%.2f\n", counter, GPS_Pack->timeDateBuf, BME_Pack->pressure, BME_Pack->humidity, BME_Pack->temperature, BME_Pack->altitude, BME_Pack->velocity, BMI_Pack->acc_x, BMI_Pack->acc_y, BMI_Pack->acc_z, BMI_Pack->gyro_x, BMI_Pack->gyro_y, BMI_Pack->gyro_z, Backup_Pack->r_status, BMI_Pack->angle, Backup_Pack->q[0], Backup_Pack->q[1], Backup_Pack->q[2], Backup_Pack->q[3], Backup_Pack->max_altitude, GPS_Pack->lat, GPS_Pack->lon, GPS_Pack->satInUse, GPS_Pack->altitudeInMeter, Power_Pack->voltaj, Power_Pack->akim, Power_Pack->mWatt_s);
+	sprintf(_aBuf, "%lu;%.0f;%.3f;%.1f;%.1f;%.1f;%.1f;%f;%f;%f;%f;%f;%f;%d;%.2f;%f;%f;%f;%f;%.1f;%f;%f;%d;%.1f;%.2f;%.2f;%.2f\n", counter, GPS_Pack->timeDateBuf, BME_Pack->pressure, BME_Pack->humidity, BME_Pack->temperature, BME_Pack->altitude, BME_Pack->velocity, BMI_Pack->acc_x, BMI_Pack->acc_y, BMI_Pack->acc_z, BMI_Pack->gyro_x, BMI_Pack->gyro_y, BMI_Pack->gyro_z, Backup_Pack->r_status, BMI_Pack->angle, Backup_Pack->q[0], Backup_Pack->q[1], Backup_Pack->q[2], Backup_Pack->q[3], Backup_Pack->max_altitude, GPS_Pack->lat, GPS_Pack->lon, GPS_Pack->satInUse, GPS_Pack->altitudeInMeter, Power_Pack->voltaj, Power_Pack->akim, Power_Pack->mWatt_s);
 #else
-	sprintf(_aBuf, "%lu,%.0f,%.3f,%.1f,%.1f,%.1f,%.1f,%f,%f,%f,%f,%f,%f,%d,%.2f,%f,%f,%f,%f,%.1f,%f,%f,%d,%.1f,%.2f,%.2f,%.2f\n", counter, GPS_Pack->timeDateBuf, BME_Pack->pressure, BME_Pack->humidity, BME_Pack->temperature, BME_Pack->altitude, BME_Pack->velocity, BMI_Pack->acc_x, BMI_Pack->acc_y, BMI_Pack->acc_z, BMI_Pack->gyro_x, BMI_Pack->gyro_y, BMI_Pack->gyro_z, Backup_Pack->r_status, BMI_Pack->angle, Backup_Pack->q[0], Backup_Pack->q[1], Backup_Pack->q[2], Backup_Pack->q[3], strain_gage_get_vals(&loadcell), GPS_Pack->lat, GPS_Pack->lon, GPS_Pack->satInUse, GPS_Pack->altitudeInMeter, Power_Pack->voltaj, Power_Pack->akim, Power_Pack->mWatt_s);
+	sprintf(_aBuf, "%lu;%.0f;%.3f;%.1f;%.1f;%.1f;%.1f;%f;%f;%f;%f;%f;%f;%d;%.2f;%f;%f;%f;%f;%.1f;%f;%f;%d;%.1f;%.2f;%.2f;%.2f\n", counter, GPS_Pack->timeDateBuf, BME_Pack->pressure, BME_Pack->humidity, BME_Pack->temperature, BME_Pack->altitude, BME_Pack->velocity, BMI_Pack->acc_x, BMI_Pack->acc_y, BMI_Pack->acc_z, BMI_Pack->gyro_x, BMI_Pack->gyro_y, BMI_Pack->gyro_z, Backup_Pack->r_status, BMI_Pack->angle, Backup_Pack->q[0], Backup_Pack->q[1], Backup_Pack->q[2], Backup_Pack->q[3], strain_gage_get_vals(&loadcell), GPS_Pack->lat, GPS_Pack->lon, GPS_Pack->satInUse, GPS_Pack->altitudeInMeter, Power_Pack->voltaj, Power_Pack->akim, Power_Pack->mWatt_s);
 #endif
 	fresult = f_printf(&fil, _aBuf);
 	fresult = f_close(&fil);// SD CLOSE

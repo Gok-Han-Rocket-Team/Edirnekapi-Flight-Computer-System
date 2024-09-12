@@ -245,6 +245,12 @@ int main(void)
 
 	  getInitialQuaternion();
 
+	  bme280_update();
+		if(BME280_sensor.altitude < 200.0 && BME280_sensor.altitude > -200.0){
+
+			saved_datas->base_altitude = BME280_sensor.altitude + saved_datas->base_altitude;
+			saved_datas->max_altitude = 0.0;
+		}
 #ifndef	ROCKET_CARD
   straing_gage_gpio_init(&loadcell, GPIO_0_GPIO_Port, GPIO_0_Pin, GPIO_1_GPIO_Port, GPIO_1_Pin);
 #endif
@@ -288,6 +294,8 @@ int main(void)
   ext_pin_open_duration(&buzzer, 1000);
   BMI_sensor.rawDatas.isGyroUpdated = 0;
   BMI_sensor.rawDatas.isAccelUpdated = 0;
+
+
 
   /* USER CODE END 2 */
 

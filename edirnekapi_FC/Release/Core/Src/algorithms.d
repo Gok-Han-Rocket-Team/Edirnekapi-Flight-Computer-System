@@ -36,7 +36,15 @@ Core/Src/algorithms.o: ../Core/Src/algorithms.c ../Core/Inc/algorithms.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
  ../Core/Inc/configuration.h ../Core/Inc/bme280.h ../Core/Inc/main.h \
  ../Core/Inc/externalPins.h ../Core/Inc/reset_detect.h \
- ../Core/Inc/algorithms.h ../Core/Inc/queternion.h
+ ../Core/Inc/algorithms.h ../Core/Inc/queternion.h \
+ ../Core/Inc/usr_fat_sd.h ../Core/Inc/queternion.h ../Core/Inc/lora.h \
+ ../Core/Inc/usr_gnss_l86_parser.h ../Core/Inc/usr_gnssGeneral.h \
+ ../Core/Inc/dataPacking.h ../Core/Inc/reset_detect.h \
+ ../FATFS/App/fatfs.h ../Middlewares/Third_Party/FatFs/src/ff.h \
+ ../Middlewares/Third_Party/FatFs/src/integer.h ../FATFS/Target/ffconf.h \
+ ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h \
+ ../Middlewares/Third_Party/FatFs/src/diskio.h \
+ ../Middlewares/Third_Party/FatFs/src/ff.h ../FATFS/Target/user_diskio.h
 ../Core/Inc/algorithms.h:
 ../Core/Inc/bmi088.h:
 ../Core/Inc/main.h:
@@ -81,3 +89,18 @@ Core/Src/algorithms.o: ../Core/Src/algorithms.c ../Core/Inc/algorithms.h \
 ../Core/Inc/reset_detect.h:
 ../Core/Inc/algorithms.h:
 ../Core/Inc/queternion.h:
+../Core/Inc/usr_fat_sd.h:
+../Core/Inc/queternion.h:
+../Core/Inc/lora.h:
+../Core/Inc/usr_gnss_l86_parser.h:
+../Core/Inc/usr_gnssGeneral.h:
+../Core/Inc/dataPacking.h:
+../Core/Inc/reset_detect.h:
+../FATFS/App/fatfs.h:
+../Middlewares/Third_Party/FatFs/src/ff.h:
+../Middlewares/Third_Party/FatFs/src/integer.h:
+../FATFS/Target/ffconf.h:
+../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h:
+../Middlewares/Third_Party/FatFs/src/diskio.h:
+../Middlewares/Third_Party/FatFs/src/ff.h:
+../FATFS/Target/user_diskio.h:

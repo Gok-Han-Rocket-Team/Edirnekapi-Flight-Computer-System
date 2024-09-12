@@ -6,5 +6,6 @@
 ../Core/Src/usr_fat_sd.c:123:13:sdInitials	8	static
 ../Core/Src/usr_fat_sd.c:144:13:openFolder	4	static
 ../Core/Src/usr_fat_sd.c:159:13:usrFatTest	4	static
-../Core/Src/usr_fat_sd.c:215:12:sd_transmit	272	static
-../Core/Src/usr_fat_sd.c:228:13:sdDataLogger	432	static
+../Core/Src/usr_fat_sd.c:216:5:sd_csv_log_transmit	24	static
+../Core/Src/usr_fat_sd.c:227:12:sd_transmit	272	static
+../Core/Src/usr_fat_sd.c:240:13:sdDataLogger	432	static

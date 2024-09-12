@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include "reset_detect.h"
 #include "queternion.h"
+#include "usr_fat_sd.h"
 
 extern UART_HandleTypeDef huart1;
 extern backup_sram_datas_s *saved_datas;
@@ -86,6 +87,7 @@ void algorithm_1_update(BME_280_t* BME)
 	  algorithm_1_start_time_u32 = HAL_GetTick();
 	  saved_datas->r_status = saved_datas->r_status < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : saved_datas->r_status;
 	  ext_pin_open(&buzzer);
+	  sd_csv_log_transmit("Rising via pressure");
 	}
 
 	//Falling detection || First parachute
@@ -103,6 +105,7 @@ void algorithm_1_update(BME_280_t* BME)
 	  isFalling = 1;
 	  saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : saved_datas->r_status;
 	  deploy_p_1();
+	  sd_csv_log_transmit("P_1 via pressure");
 	}
 
 	//Second Parachute
@@ -121,6 +124,7 @@ void algorithm_1_update(BME_280_t* BME)
 		saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : saved_datas->r_status;
 		is_second_p_OK_1 = 1;
 		deploy_p_2();
+		sd_csv_log_transmit("P_2 via pressure algorithm_1");
 	}
   }
 }
@@ -138,6 +142,7 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI)
 		algorithm_2_start_time_u32 = HAL_GetTick();
 		saved_datas->r_status = saved_datas->r_status < STAT_FLIGHT_STARTED ? STAT_FLIGHT_STARTED : saved_datas->r_status;
 		ext_pin_open(&buzzer);
+		sd_csv_log_transmit("Rising via Accel");
 	}
 
 	//Burnout detection
@@ -150,15 +155,19 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI)
 	{
 		saved_datas->r_status = saved_datas->r_status < STAT_MOTOR_BURNOUT ? STAT_MOTOR_BURNOUT : saved_datas->r_status;
 		ext_pin_open(&buzzer);
+		sd_csv_log_transmit("Burnout");
 	}
 
+#ifdef Q_SET_ZERO_ACTIVATE
 	//quaternion setting to zero
 	if((HAL_GetTick() - algorithm_2_start_time_u32) > QUATERNION_ZERO_TIME && is_quaternion_zeroed == 0 && isRising_2 == 1)
 	{
 	  quaternionSet_zero();
 	  is_quaternion_zeroed = 1;
 	  ext_pin_open(&buzzer);
+	  sd_csv_log_transmit("Quaternion set zero");
 	}
+#endif
 
 	//Falling detection || First parachute
 	if(BMI->angle > ANGLE_THRESHOLD && isRising_2 == 1 && isFalling_2 == 0 && HAL_GetTick() - algorithm_2_start_time_u32 > ALGORITHM_2_LOCKOUT_TIME)
@@ -166,6 +175,7 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI)
 		isFalling_2 = 1;
 		saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_NO ? STAT_P1_OK_P2_NO : saved_datas->r_status;
 		deploy_p_1();
+		sd_csv_log_transmit("P_1 via Gyro");
 	}
 
 	if(is_BME_ok == 1)
@@ -183,6 +193,7 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI)
 			saved_datas->r_status = saved_datas->r_status < STAT_P1_OK_P2_OK ? STAT_P1_OK_P2_OK : saved_datas->r_status;
 			is_secondP_OK = 1;
 			deploy_p_2();
+			sd_csv_log_transmit("P_2 via pressure algorithm_2");
 		}
 	}
 	//Touchdown Detection
@@ -199,5 +210,6 @@ void algorithm_2_update(BME_280_t* BME, bmi088_struct_t* BMI)
 		is_TD = 1;
 		saved_datas->r_status = saved_datas->r_status < STAT_TOUCH_DOWN ? STAT_TOUCH_DOWN : saved_datas->r_status;
 		ext_pin_open(&buzzer);
+		sd_csv_log_transmit("TD");
 	}
 }
