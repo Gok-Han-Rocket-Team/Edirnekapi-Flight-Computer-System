@@ -1018,13 +1018,13 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 void deploy_p_1()
 {
-	ext_pin_open_duration(&mos_1, 100);
+	ext_pin_open_duration(&mos_1, IGNITER_TIME);
 	ext_pin_open(&buzzer);
 }
 
 void deploy_p_2()
 {
-	ext_pin_open_duration(&mos_2, 100);
+	ext_pin_open_duration(&mos_2, IGNITER_TIME);
 	ext_pin_open(&buzzer);
 }
 

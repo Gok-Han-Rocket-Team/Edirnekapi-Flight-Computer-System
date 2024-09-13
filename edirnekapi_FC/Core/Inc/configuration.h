@@ -39,6 +39,7 @@
 #define BURNOUT_THRESHOLD			(float)-2000.0		//mG			-2000.0
 #define ANGLE_THRESHOLD				(float)80.0			//degree		80.0
 
+#define IGNITER_TIME				(uint32_t)100		//ms			100
 //#define Q_SET_ZERO_ACTIVATE
 //************************************   Battery Settings   ************************************
 #define LOW_BAT						(float)7.0			//V
